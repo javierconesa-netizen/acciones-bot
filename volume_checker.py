@@ -30,32 +30,28 @@ TICKERS = [
     'BTC-USD',
 ]
 
-# Nombres más limpios para las búsquedas de noticias si el ticker no es intuitivo
 NAMES = {'MC.PA': 'LVMH', 'BTC-USD': 'Bitcoin'}
-
 SEEN_NEWS_FILE = 'seen_news.json'
 
 
-# 1. Envía alertas de precios y volumen al TEMA 1 (Acciones cartera)
 def send_alert_telegram(message):
   url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
   payload = {
       'chat_id': CHAT_ID,
       'text': message,
       'parse_mode': 'Markdown',
-      'message_thread_id': 1,  # <--- Tema 1
+      'message_thread_id': 1,  # Tema 1: Acciones cartera
   }
   requests.post(url, json=payload)
 
 
-# 2. Envía noticias de todas las acciones al TEMA 3 (Noticias Cartera)
 def send_news_telegram(message):
   url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
   payload = {
       'chat_id': CHAT_ID,
       'text': message,
       'parse_mode': 'Markdown',
-      'message_thread_id': 3,  # <--- Tema 3
+      'message_thread_id': 3,  # Tema 3: Noticias Cartera
   }
   requests.post(url, json=payload)
 
@@ -73,9 +69,7 @@ def check_all_news():
       response = requests.get(url, timeout=10)
       if response.status_code == 200:
         root = ET.fromstring(response.content)
-        items = root.findall('.//item')[
-            :1
-        ]  # Coge la noticia más reciente de cada activo
+        items = root.findall('.//item')[:1]
         for item in items:
           title_elem = item.find('title')
           link_elem = item.find('link')
@@ -96,6 +90,12 @@ def check_all_news():
 
 
 def check_market():
+  # 🧪 MENSAJE DE PRUEBA TEMPORAL
+  send_alert_telegram(
+      '🧪 *PRUEBA:* Comprobando que el Tema 1 (Acciones cartera) recibe mensajes'
+      ' correctamente.'
+  )
+
   for ticker in TICKERS:
     try:
       stock = yf.Ticker(ticker)
@@ -139,7 +139,6 @@ def check_market():
             f'{"🚨 *¡Movimiento de precio del 1.5% o más!*" if is_big_price_move else ""}'
         )
         send_alert_telegram(msg)
-
     except Exception as e:
       print(f'Error procesando {ticker}: {e}')
 
