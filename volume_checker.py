@@ -57,6 +57,7 @@ FALLBACK_DIVIDENDS = {
 
 SEEN_NEWS_FILE = 'seen_news.json'
 LAST_SUMMARY_FILE = 'last_summary.json'  # Control para el resumen diario
+LAST_ALERT_FILE = 'last_alert_prices.json'  # Control para evitar spam de alertas
 
 session = requests.Session()
 session.headers['User-Agent'] = (
@@ -131,6 +132,17 @@ def check_market():
   tz_spain = pytz.timezone('Europe/Madrid')
   now_spain = datetime.now(tz_spain)
   today_str = now_spain.strftime('%Y-%m-%d')
+
+  # Cargar precios de la última alerta para evitar spam
+  last_alert_prices = {}
+  if os.path.exists(LAST_ALERT_FILE):
+    try:
+      with open(LAST_ALERT_FILE, 'r') as f:
+        last_alert_prices = json.load(f)
+    except Exception:
+      pass
+
+  updated_alerts = last_alert_prices.copy()
 
   summary_data = []
   dividend_data = []
@@ -258,7 +270,7 @@ def check_market():
       except Exception:
         earnings_data.append({'name': search_term, 'date': 'No disponible'})
 
-      # --- ALERTAS EN TIEMPO REAL (Se ejecutan siempre cada 15 min) ---
+      # --- ALERTAS EN TIEMPO REAL (Con filtro anti-spam) ---
       is_big_price_move = abs(price_change) >= 1.5
       vol_label = ''
       if avg_volume > 0:
@@ -267,7 +279,19 @@ def check_market():
         elif vol_today >= avg_volume:
           vol_label = '⚠️ *¡Volumen al 100% de la media!*'
 
-      if is_big_price_move or bool(vol_label):
+      should_alert_price = False
+      if is_big_price_move:
+        if ticker not in last_alert_prices:
+          should_alert_price = True
+        else:
+          last_price_alerted = last_alert_prices[ticker]
+          diff_from_last = (
+              abs(close_today - last_price_alerted) / last_price_alerted
+          ) * 100
+          if diff_from_last >= 1.0:  # 1% adicional de variación
+            should_alert_price = True
+
+      if should_alert_price or bool(vol_label):
         msg = (
             f'📊 *Alerta Mercado: {search_term}*\n'
             f'• *Precio:* {currency}{close_today:.2f} ({price_change:+.2f}%)\n'
@@ -275,8 +299,15 @@ def check_market():
         )
         send_telegram(msg)
 
+        if is_big_price_move:
+          updated_alerts[ticker] = close_today
+
     except Exception as e:
       print(f'Error procesando {ticker}: {e}')
+
+  # Guardar los precios de la última alerta
+  with open(LAST_ALERT_FILE, 'w') as f:
+    json.dump(updated_alerts, f)
 
   # --- RESUMEN DE CIERRE (Solo se envía una vez al día, a partir de las 22:00 hora España) ---
   should_send_summary = False
