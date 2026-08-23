@@ -1,0 +1,33 @@
+name: Volume and Price Checker
+
+on:
+  schedule:
+    - cron: '0 21 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  run-volume-checker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install requests yfinance pandas
+
+      - name: Run script
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python volume_checker.py
+
+      - name: Save state cache
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "Update volume alerts cache"
+          file_patterns: last_market_alerts.json
