@@ -39,7 +39,6 @@ TICKERS = [
     'BTC-USD',
 ]
 
-# Nombres específicos para evitar confusiones en las noticias (ej. OPEN con el US Open de tenis)
 NAMES = {
     'MC.PA': 'LVMH',
     'BTC-USD': 'Bitcoin',
@@ -77,14 +76,13 @@ def send_telegram(message, thread_id=None):
     print(f'Error enviando mensaje a Telegram: {e}')
 
 
-# --- NOTICIAS (Con filtro anti-deportes/basura) ---
+# --- NOTICIAS ---
 def check_all_news():
   seen_news = []
   if os.path.exists(SEEN_NEWS_FILE):
     with open(SEEN_NEWS_FILE, 'r') as f:
       seen_news = json.load(f)
 
-  # Palabras clave para descartar noticias que no sean de bolsa/financieras
   forbidden_words = [
       'tenis',
       'alcaraz',
@@ -112,14 +110,11 @@ def check_all_news():
             title = title_elem.text
             link = link_elem.text
 
-            # Comprobar si la noticia contiene alguna palabra prohibida (ej. deportes)
             title_lower = title.lower()
             if any(fw in title_lower for fw in forbidden_words):
-              print(f'Noticia descartada por filtro de contenido: {title}')
               continue
 
             news_id = f'{ticker}_{title}'
-
             if news_id not in seen_news:
               msg = f'📰 *Noticia ({search_term})*\n• {title}\n[Leer noticia]({link})'
               send_telegram(msg, thread_id=3)
@@ -261,7 +256,7 @@ def check_market():
       except Exception:
         earnings_data.append({'name': search_term, 'date': 'No disponible'})
 
-      # Alertas en tiempo real (Volumen / Precio)
+      # Alertas en tiempo real
       is_big_price_move = abs(price_change) >= 1.5
       vol_label = ''
       if avg_volume > 0:
@@ -292,14 +287,42 @@ def check_market():
       )
     send_telegram('\n'.join(summary_lines), thread_id=SUMMARY_THREAD_ID)
 
+  # Dividendos filtrados (sin fechas pasadas), ordenados por proximidad y con el % al lado
   if dividend_data:
-    dividend_data.sort(key=lambda x: x['yield_pct'], reverse=True)
+    now_date = now_spain.date()
+    valid_dividends = []
+
     for item in dividend_data:
-      dividend_lines.append(
-          f"💵 *{item['name']}*: `{item['yield_pct']:.2f}%` anual"
-          f" ({item['currency']}{item['div_rate']:.2f}) | Ex-div:"
-          f" `{item['ex_date']}`"
+      ex_str = item['ex_date']
+      if ex_str == 'Próximamente':
+        valid_dividends.append(item)
+      else:
+        try:
+          d = datetime.strptime(ex_str, '%d/%m/%Y').date()
+          if d >= now_date:
+            item['parsed_date'] = d
+            valid_dividends.append(item)
+        except Exception:
+          pass
+
+    valid_dividends.sort(
+        key=lambda x: (
+            0 if 'parsed_date' in x else 1,
+            x.get('parsed_date', datetime.max.date()),
+        )
+    )
+
+    for item in valid_dividends:
+      date_display = (
+          item['parsed_date'].strftime('%d/%m/%Y')
+          if 'parsed_date' in item
+          else item['ex_date']
       )
+      dividend_lines.append(
+          f"💵 *{item['name']}* — `{date_display}` (`{item['yield_pct']:.2f}%`"
+          f' anual | {item["currency"]}{item["div_rate"]:.2f})'
+      )
+
     send_telegram('\n'.join(dividend_lines), thread_id=DIVIDENDS_THREAD_ID)
 
   if earnings_data:
@@ -321,7 +344,7 @@ def check_market():
       )
     send_telegram('\n'.join(technical_lines), thread_id=TECHNICAL_THREAD_ID)
 
-  # Índice de Miedo y Codicia traducido y ampliado
+  # Índice de Miedo y Codicia
   try:
     fng_res = requests.get(
         'https://api.alternative.me/fng/?limit=1', timeout=10
