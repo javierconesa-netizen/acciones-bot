@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time, timedelta
 import json
 import os
 import xml.etree.ElementTree as ET
@@ -78,6 +78,24 @@ def send_telegram(message, thread_id=None):
     print(f'Error enviando mensaje a Telegram: {e}')
 
 
+def get_market_session_start(now_spain, ticker):
+  # 1. Bitcoin: Funciona 24/7, se resetea a las 00:00 (medianoche)
+  if ticker == 'BTC-USD':
+    market_time = time(0, 0)
+  # 2. Grupo Europa: Se resetea a las 09:00
+  elif ticker in ['MC.PA', 'NOV.DE']:
+    market_time = time(9, 0)
+  # 3. Grupo EE.UU. y resto: Se resetea a las 15:30
+  else:
+    market_time = time(15, 30)
+
+  session_date = now_spain.date()
+  if now_spain.time() < market_time:
+    session_date = session_date - timedelta(days=1)
+
+  return datetime.combine(session_date, market_time).strftime('%Y-%m-%d %H:%M')
+
+
 # --- NOTICIAS ---
 def check_all_news():
   seen_news = []
@@ -142,7 +160,7 @@ def check_market():
         last_alert_prices = json.load(f)
     except Exception:
       pass
-  updated_alerts = last_alert_prices.copy()
+  updated_alerts = {}
 
   last_alert_volumes = {}
   if os.path.exists(LAST_VOLUME_FILE):
@@ -151,7 +169,7 @@ def check_market():
         last_alert_volumes = json.load(f)
     except Exception:
       pass
-  updated_volumes = last_alert_volumes.copy()
+  updated_volumes = {}
 
   summary_data = []
   dividend_data = []
@@ -177,6 +195,8 @@ def check_market():
 
   for ticker in TICKERS:
     search_term = NAMES.get(ticker, ticker)
+    current_session = get_market_session_start(now_spain, ticker)
+
     try:
       stock = yf.Ticker(ticker, session=session)
       hist = stock.history(period='3mo')
@@ -201,6 +221,18 @@ def check_market():
           'change': price_change,
           'currency': currency,
       })
+
+      # Validar sesión para precios
+      saved_price_data = last_alert_prices.get(ticker, {})
+      last_price_alerted = None
+      if saved_price_data.get('session') == current_session:
+        last_price_alerted = saved_price_data.get('value')
+
+      # Validar sesión para volúmenes
+      saved_vol_data = last_alert_volumes.get(ticker, {})
+      last_vol_alerted = None
+      if saved_vol_data.get('session') == current_session:
+        last_vol_alerted = saved_vol_data.get('value')
 
       # Dividendos
       div_rate = None
@@ -278,14 +310,13 @@ def check_market():
       except Exception:
         earnings_data.append({'name': search_term, 'date': 'No disponible'})
 
-      # --- ALERTAS EN TIEMPO REAL (Con filtros anti-spam de 1% precio y 25% volumen) ---
+      # --- ALERTAS EN TIEMPO REAL ---
       is_big_price_move = abs(price_change) >= 1.5
       should_alert_price = False
       if is_big_price_move:
-        if ticker not in last_alert_prices:
+        if last_price_alerted is None:
           should_alert_price = True
         else:
-          last_price_alerted = last_alert_prices[ticker]
           diff_from_last = (
               abs(close_today - last_price_alerted) / last_price_alerted
           ) * 100
@@ -297,11 +328,9 @@ def check_market():
       if avg_volume > 0:
         is_vol_high = vol_today >= avg_volume
         if is_vol_high:
-          if ticker not in last_alert_volumes:
+          if last_vol_alerted is None:
             should_alert_vol = True
           else:
-            last_vol_alerted = last_alert_volumes[ticker]
-            # Salta si el volumen actual es un 25% mayor que en el último aviso
             if vol_today >= (last_vol_alerted * 1.25):
               should_alert_vol = True
 
@@ -319,10 +348,22 @@ def check_market():
         )
         send_telegram(msg)
 
-        if is_big_price_move and should_alert_price:
-          updated_alerts[ticker] = close_today
-        if should_alert_vol:
-          updated_volumes[ticker] = vol_today
+      # Actualizar estados de memoria por ticker y sesión
+      if should_alert_price:
+        updated_alerts[ticker] = {
+            'session': current_session,
+            'value': close_today,
+        }
+      elif last_price_alerted is not None:
+        updated_alerts[ticker] = saved_price_data
+
+      if should_alert_vol:
+        updated_volumes[ticker] = {
+            'session': current_session,
+            'value': vol_today,
+        }
+      elif last_vol_alerted is not None:
+        updated_volumes[ticker] = saved_vol_data
 
     except Exception as e:
       print(f'Error procesando {ticker}: {e}')
