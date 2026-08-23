@@ -9,8 +9,9 @@ import yfinance as yf
 TELEGRAM_TOKEN = os.environ['TELEGRAM_TOKEN']
 CHAT_ID = os.environ['CHAT_ID']
 
-# ID del tema "Precio de cierre"
-SUMMARY_THREAD_ID = 137
+# IDs de los temas en Telegram
+SUMMARY_THREAD_ID = 137  # Tema: Precio de cierre
+DIVIDENDS_THREAD_ID = 257  # Tema: Dividendos y ex-dividendos
 
 TICKERS = [
     'KO',
@@ -65,7 +66,19 @@ def send_summary_telegram(message):
   requests.post(url, json=payload)
 
 
-# 3. Noticias -> Tema 3 (Noticias Cartera)
+# 3. Dividendos y ex-dividendos -> Tema "Dividendos y ex-dividendos" (ID: 257)
+def send_dividends_telegram(message):
+  url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
+  payload = {
+      'chat_id': CHAT_ID,
+      'text': message,
+      'parse_mode': 'Markdown',
+      'message_thread_id': DIVIDENDS_THREAD_ID,
+  }
+  requests.post(url, json=payload)
+
+
+# 4. Noticias -> Tema 3 (Noticias Cartera)
 def send_news_telegram(message):
   url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
   payload = {
@@ -120,10 +133,17 @@ def check_market():
   ) or is_manual_run
 
   summary_data = []
+  dividend_data = []
+
   summary_lines = [
       '📊 *Resumen Cierre de Mercado* 📊',
       f'📅 *Fecha:* {now_spain.strftime("%d/%m/%Y")}',
       f'🕒 *Hora:* {now_spain.strftime("%H:%M:%S")}\n',
+  ]
+
+  dividend_lines = [
+      '💰 *Calendario de Dividendos* 💰',
+      f'📅 *Fecha:* {now_spain.strftime("%d/%m/%Y")}\n',
   ]
 
   for ticker in TICKERS:
@@ -145,8 +165,28 @@ def check_market():
       avg_volume = hist['Volume'][:-1].mean() if len(hist) > 1 else vol_today
       price_change = ((close_today - close_prev) / close_prev) * 100
 
-      # Asignar símbolo de moneda correcto (€ para europeas, $ para el resto)
       currency = '€' if ticker in ['MC.PA', 'NOV.DE'] else '$'
+
+      # --- RECOGIDA DE DATOS DE DIVIDENDOS ---
+      info = stock.info
+      div_rate = info.get('dividendRate')
+      ex_div_timestamp = info.get('exDividendDate')
+
+      if div_rate and div_rate > 0:
+        ex_date_str = 'No disponible'
+        if ex_div_timestamp:
+          ex_date_obj = datetime.fromtimestamp(ex_div_timestamp, tz=tz_spain)
+          ex_date_str = ex_date_obj.strftime('%d/%m/%Y')
+
+        if is_closing_time:
+          dividend_data.append(
+              {
+                  'name': search_term,
+                  'div_rate': div_rate,
+                  'ex_date': ex_date_str,
+                  'currency': currency,
+              }
+          )
 
       # --- LÓGICA 1: Alertas individuales en tiempo real ---
       is_big_price_move = abs(price_change) >= 1.5
@@ -175,7 +215,7 @@ def check_market():
         )
         send_alert_telegram(msg)
 
-      # --- LÓGICA 2: Datos para el resumen ordenado ---
+      # --- LÓGICA 2: Datos para el resumen ordenado de precios ---
       if is_closing_time:
         summary_data.append(
             {
@@ -189,7 +229,7 @@ def check_market():
     except Exception as e:
       print(f'Error procesando {ticker}: {e}')
 
-  # Enviar resumen ordenado de mayor a menor subida con su divisa correcta
+  # Enviar resumen de precios al Tema 137
   if is_closing_time and summary_data:
     summary_data.sort(key=lambda x: x['change'], reverse=True)
     for item in summary_data:
@@ -198,9 +238,16 @@ def check_market():
           f"{emoji} *{item['name']}*: {item['currency']}{item['price']:.2f}"
           f" (`{item['change']:+.2f}%`)"
       )
+    send_summary_telegram('\n'.join(summary_lines))
 
-    full_summary = '\n'.join(summary_lines)
-    send_summary_telegram(full_summary)
+  # Enviar resumen independiente de dividendos al Tema 257
+  if is_closing_time and dividend_data:
+    for item in dividend_data:
+      dividend_lines.append(
+          f"• *{item['name']}*: {item['currency']}{item['div_rate']:.2f} anual"
+          f" (Ex-div: `{item['ex_date']}`)"
+      )
+    send_dividends_telegram('\n'.join(dividend_lines))
 
 
 if __name__ == '__main__':
