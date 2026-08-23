@@ -46,7 +46,6 @@ NAMES = {
     'OPEN': 'Opendoor Technologies',
 }
 
-# Fechas de ejemplo futuras para que aparezcan en el calendario
 FALLBACK_DIVIDENDS = {
     'KO': {'div_rate': 1.94, 'yield_pct': 3.10, 'ex_date': '15/09/2026'},
     'MC.PA': {'div_rate': 13.00, 'yield_pct': 2.05, 'ex_date': '28/10/2026'},
@@ -57,6 +56,7 @@ FALLBACK_DIVIDENDS = {
 }
 
 SEEN_NEWS_FILE = 'seen_news.json'
+LAST_SUMMARY_FILE = 'last_summary.json'  # Control para el resumen diario
 
 session = requests.Session()
 session.headers['User-Agent'] = (
@@ -65,7 +65,6 @@ session.headers['User-Agent'] = (
 )
 
 
-# --- FUNCIONES DE ENVÍO ---
 def send_telegram(message, thread_id=None):
   url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
   payload = {'chat_id': CHAT_ID, 'text': message, 'parse_mode': 'Markdown'}
@@ -77,7 +76,7 @@ def send_telegram(message, thread_id=None):
     print(f'Error enviando mensaje a Telegram: {e}')
 
 
-# --- NOTICIAS ---
+# --- NOTICIAS (Se ejecuta cada 15 min y solo avisa si hay novedades) ---
 def check_all_news():
   seen_news = []
   if os.path.exists(SEEN_NEWS_FILE):
@@ -131,6 +130,7 @@ def check_all_news():
 def check_market():
   tz_spain = pytz.timezone('Europe/Madrid')
   now_spain = datetime.now(tz_spain)
+  today_str = now_spain.strftime('%Y-%m-%d')
 
   summary_data = []
   dividend_data = []
@@ -174,7 +174,7 @@ def check_market():
       price_change = ((close_today - close_prev) / close_prev) * 100
       currency = '€' if ticker in ['MC.PA', 'NOV.DE'] else '$'
 
-      # 1. Resumen de precios
+      # Guardar datos para el resumen de cierre
       summary_data.append({
           'name': search_term,
           'price': close_today,
@@ -182,7 +182,7 @@ def check_market():
           'currency': currency,
       })
 
-      # 2. Dividendos (Priorizamos datos limpios del fallback con fechas futuras para control total)
+      # Dividendos
       div_rate = None
       ex_date_str = 'Próximamente'
       yield_pct = 0.0
@@ -218,7 +218,7 @@ def check_market():
             'currency': currency,
         })
 
-      # 3. Análisis Técnico (RSI) con Normal en Naranja
+      # Análisis Técnico (RSI)
       try:
         delta = hist['Close'].diff()
         gain = delta.where(delta > 0, 0.0)
@@ -243,7 +243,7 @@ def check_market():
       except Exception:
         pass
 
-      # 4. Earnings (Resultados)
+      # Earnings
       try:
         cal = stock.calendar
         edate_str = 'No programada'
@@ -258,7 +258,7 @@ def check_market():
       except Exception:
         earnings_data.append({'name': search_term, 'date': 'No disponible'})
 
-      # Alertas en tiempo real
+      # --- ALERTAS EN TIEMPO REAL (Se ejecutan siempre cada 15 min) ---
       is_big_price_move = abs(price_change) >= 1.5
       vol_label = ''
       if avg_volume > 0:
@@ -278,110 +278,127 @@ def check_market():
     except Exception as e:
       print(f'Error procesando {ticker}: {e}')
 
-  # --- ENVÍOS A CADA TEMA ---
-  if summary_data:
-    summary_data.sort(key=lambda x: x['change'], reverse=True)
-    for item in summary_data:
-      emoji = '🟢' if item['change'] >= 0 else '🔴'
-      summary_lines.append(
-          f"{emoji} *{item['name']}*: {item['currency']}{item['price']:.2f}"
-          f" (`{item['change']:+.2f}%`)"
-      )
-    send_telegram('\n'.join(summary_lines), thread_id=SUMMARY_THREAD_ID)
+  # --- RESUMEN DE CIERRE (Solo se envía una vez al día, a partir de las 22:00 hora España) ---
+  should_send_summary = False
+  if now_spain.hour >= 22:  # Tras el cierre de mercado de EE. UU.
+    last_summary_date = ''
+    if os.path.exists(LAST_SUMMARY_FILE):
+      with open(LAST_SUMMARY_FILE, 'r') as f:
+        last_summary_date = json.load(f)
 
-  # Dividendos filtrados, ordenados por proximidad de fecha y con el % al lado
-  if dividend_data:
-    now_date = now_spain.date()
-    valid_dividends = []
+    if last_summary_date != today_str:
+      should_send_summary = True
 
-    for item in dividend_data:
-      ex_str = item['ex_date']
-      if ex_str == 'Próximamente':
-        valid_dividends.append(item)
-      else:
-        try:
-          d = datetime.strptime(ex_str, '%d/%m/%Y').date()
-          if d >= now_date:
-            item['parsed_date'] = d
-            valid_dividends.append(item)
-        except Exception:
-          pass
-
-    valid_dividends.sort(
-        key=lambda x: (
-            0 if 'parsed_date' in x else 1,
-            x.get('parsed_date', datetime.max.date()),
+  if should_send_summary:
+    # 1. Enviar resumen de precios
+    if summary_data:
+      summary_data.sort(key=lambda x: x['change'], reverse=True)
+      for item in summary_data:
+        emoji = '🟢' if item['change'] >= 0 else '🔴'
+        summary_lines.append(
+            f"{emoji} *{item['name']}*: {item['currency']}{item['price']:.2f}"
+            f" (`{item['change']:+.2f}%`)"
         )
-    )
+      send_telegram('\n'.join(summary_lines), thread_id=SUMMARY_THREAD_ID)
 
-    for item in valid_dividends:
-      date_display = (
-          item['parsed_date'].strftime('%d/%m/%Y')
-          if 'parsed_date' in item
-          else item['ex_date']
+    # 2. Enviar dividendos
+    if dividend_data:
+      now_date = now_spain.date()
+      valid_dividends = []
+      for item in dividend_data:
+        ex_str = item['ex_date']
+        if ex_str == 'Próximamente':
+          valid_dividends.append(item)
+        else:
+          try:
+            d = datetime.strptime(ex_str, '%d/%m/%Y').date()
+            if d >= now_date:
+              item['parsed_date'] = d
+              valid_dividends.append(item)
+          except Exception:
+            pass
+
+      valid_dividends.sort(
+          key=lambda x: (
+              0 if 'parsed_date' in x else 1,
+              x.get('parsed_date', datetime.max.date()),
+          )
       )
-      dividend_lines.append(
-          f"💵 *{item['name']}* — `{date_display}` (`{item['yield_pct']:.2f}%`"
-          f' anual | {item["currency"]}{item["div_rate"]:.2f})'
-      )
-
-    send_telegram('\n'.join(dividend_lines), thread_id=DIVIDENDS_THREAD_ID)
-
-  if earnings_data:
-    earnings_data.sort(
-        key=lambda x: (
-            0 if (x['date'] and x['date'][0].isdigit()) else 1,
-            x['date'],
+      for item in valid_dividends:
+        date_display = (
+            item['parsed_date'].strftime('%d/%m/%Y')
+            if 'parsed_date' in item
+            else item['ex_date']
         )
-    )
-    for item in earnings_data:
-      earnings_lines.append(f'• *{item["name"]}*: `{item["date"]}`')
-    send_telegram('\n'.join(earnings_lines), thread_id=EARNINGS_THREAD_ID)
+        dividend_lines.append(
+            f"💵 *{item['name']}* — `{date_display}` (`{item['yield_pct']:.2f}%`"
+            f' anual | {item["currency"]}{item["div_rate"]:.2f})'
+        )
+      send_telegram('\n'.join(dividend_lines), thread_id=DIVIDENDS_THREAD_ID)
 
-  if technical_data:
-    technical_data.sort(key=lambda x: x['rsi'], reverse=True)
-    for item in technical_data:
-      technical_lines.append(
-          f"• *{item['name']}* - RSI: `{item['rsi']:.1f}` ({item['rsi_label']})"
+    # 3. Enviar Earnings
+    if earnings_data:
+      earnings_data.sort(
+          key=lambda x: (
+              0 if (x['date'] and x['date'][0].isdigit()) else 1,
+              x['date'],
+          )
       )
-    send_telegram('\n'.join(technical_lines), thread_id=TECHNICAL_THREAD_ID)
+      for item in earnings_data:
+        earnings_lines.append(f'• *{item["name"]}*: `{item["date"]}`')
+      send_telegram('\n'.join(earnings_lines), thread_id=EARNINGS_THREAD_ID)
 
-  # Índice de Miedo y Codicia
-  try:
-    fng_res = requests.get(
-        'https://api.alternative.me/fng/?limit=1', timeout=10
-    ).json()
-    fng_val = int(fng_res['data'][0]['value'])
-    fng_class_en = fng_res['data'][0]['value_classification']
+    # 4. Enviar Análisis Técnico
+    if technical_data:
+      technical_data.sort(key=lambda x: x['rsi'], reverse=True)
+      for item in technical_data:
+        technical_lines.append(
+            f"• *{item['name']}* - RSI: `{item['rsi']:.1f}` ({item['rsi_label']})"
+        )
+      send_telegram('\n'.join(technical_lines), thread_id=TECHNICAL_THREAD_ID)
 
-    translations = {
-        'Extreme Fear': (
-            'Miedo Extremo 😱 (Zona de pánico, históricamente oportunidad de'
-            ' compra)'
-        ),
-        'Fear': 'Miedo 😨 (Sentimiento de precaución o bajista en el mercado)',
-        'Neutral': (
-            'Neutral 😐 (Equilibrio, sin tendencia clara de sentimiento)'
-        ),
-        'Greed': (
-            'Codicia 🟢 (Optimismo y presión compradora predominante)'
-        ),
-        'Extreme Greed': (
-            'Codicia Extrema 🚀 (Euforia en el mercado, atención a posibles'
-            ' correcciones)'
-        ),
-    }
-    fng_class_es = translations.get(fng_class_en, fng_class_en)
+    # 5. Índice de Miedo y Codicia
+    try:
+      fng_res = requests.get(
+          'https://api.alternative.me/fng/?limit=1', timeout=10
+      ).json()
+      fng_val = int(fng_res['data'][0]['value'])
+      fng_class_en = fng_res['data'][0]['value_classification']
 
-    fng_msg = (
-        '📉 *Índice de Miedo y Codicia* 📉\n'
-        f'📅 *Fecha:* {now_spain.strftime("%d/%m/%Y")}\n\n'
-        f'• *Valor:* `{fng_val}/100`\n'
-        f'• *Sentimiento:* *{fng_class_es}*'
-    )
-    send_telegram(fng_msg, thread_id=FEAR_GREED_THREAD_ID)
-  except Exception as e:
-    print(f'Error obteniendo Fear & Greed: {e}')
+      translations = {
+          'Extreme Fear': (
+              'Miedo Extremo 😱 (Zona de pánico, históricamente oportunidad de'
+              ' compra)'
+          ),
+          'Fear': (
+              'Miedo 😨 (Sentimiento de precaución o bajista en el mercado)'
+          ),
+          'Neutral': (
+              'Neutral 😐 (Equilibrio, sin tendencia clara de sentimiento)'
+          ),
+          'Greed': (
+              'Codicia 🟢 (Optimismo y presión compradora predominante)'
+          ),
+          'Extreme Greed': (
+              'Codicia Extrema 🚀 (Euforia en el mercado, atención a posibles'
+              ' correcciones)'
+          ),
+      }
+      fng_class_es = translations.get(fng_class_en, fng_class_en)
+
+      fng_msg = (
+          '📉 *Índice de Miedo y Codicia* 📉\n'
+          f'📅 *Fecha:* {now_spain.strftime("%d/%m/%Y")}\n\n'
+          f'• *Valor:* `{fng_val}/100`\n'
+          f'• *Sentimiento:* *{fng_class_es}*'
+      )
+      send_telegram(fng_msg, thread_id=FEAR_GREED_THREAD_ID)
+    except Exception as e:
+      print(f'Error obteniendo Fear & Greed: {e}')
+
+    # Guardar que ya se envió el resumen de hoy
+    with open(LAST_SUMMARY_FILE, 'w') as f:
+      json.dump(today_str, f)
 
 
 if __name__ == '__main__':
