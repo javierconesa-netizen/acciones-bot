@@ -43,13 +43,6 @@ NAMES = {
 }
 SEEN_NEWS_FILE = 'seen_news.json'
 
-# Sesión personalizada para evitar bloqueos de Yahoo Finance en GitHub
-session = requests.Session()
-session.headers['User-Agent'] = (
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like'
-    ' Gecko) Chrome/120.0.0.0 Safari/537.36'
-)
-
 
 # 1. Alertas individuales -> Chat general (Acciones cartera)
 def send_alert_telegram(message):
@@ -157,7 +150,7 @@ def check_market():
   for ticker in TICKERS:
     search_term = NAMES.get(ticker, ticker)
     try:
-      stock = yf.Ticker(ticker, session=session)
+      stock = yf.Ticker(ticker)
       hist = stock.history(period='10d')
 
       if len(hist) < 2:
@@ -175,59 +168,37 @@ def check_market():
 
       currency = '€' if ticker in ['MC.PA', 'NOV.DE'] else '$'
 
-      # --- RECOGIDA ROBUSTA DE DIVIDENDOS (INFO + FALLBACK HISTÓRICO) ---
+      # --- OBTENCIÓN ROBUSTA DE DIVIDENDOS SIN CONFLICTOS DE ZONA HORARIA ---
       if is_closing_time:
-        div_rate = None
-        ex_date_str = 'No disponible'
-        yield_pct = 0.0
-
         try:
-          info = stock.info
-          div_rate = info.get('dividendRate')
-          div_yield = info.get('dividendYield')
-          ex_div_timestamp = info.get('exDividendDate')
+          divs = stock.dividends
+          if divs is not None and not divs.empty:
+            
+            # 1. Quitamos la zona horaria del índice de dividendos para poder compararlo
+            if divs.index.tz is not None:
+                divs.index = divs.index.tz_convert(None)
+            
+            # 2. Creamos la fecha de "hace un año" sin zona horaria
+            one_year_ago = datetime.utcnow() - pd.DateOffset(years=1)
+            
+            # 3. Filtramos los dividendos de los últimos 365 días
+            recent_divs = divs[divs.index >= one_year_ago]
+            div_rate = recent_divs.sum()
 
-          if div_rate and div_rate > 0:
-            yield_pct = (
-                (div_yield * 100)
-                if div_yield
-                else ((div_rate / close_today) * 100 if close_today > 0 else 0.0)
-            )
-            if ex_div_timestamp:
-              ex_date_obj = datetime.fromtimestamp(
-                  ex_div_timestamp, tz=tz_spain
-              )
-              ex_date_str = ex_date_obj.strftime('%d/%m/%Y')
-          else:
-            # Fallback al historial de pagos si info falla o viene vacío
-            divs = stock.dividends
-            if not divs.empty:
-              one_year_ago = pd.Timestamp.now(tz=tz_spain) - pd.DateOffset(
-                  years=1
-              )
-              recent_divs = divs[divs.index >= one_year_ago]
-              div_rate = recent_divs.sum()
-              if div_rate and div_rate > 0:
-                yield_pct = (
-                    (div_rate / close_today) * 100 if close_today > 0 else 0.0
-                )
-                last_date = divs.index[-1]
-                ex_date_str = last_date.strftime('%d/%m/%Y')
-                print(
-                    f'[{ticker}] Dividendo obtenido por historial:'
-                    f' {div_rate}'
-                )
+            if div_rate > 0:
+              yield_pct = (div_rate / close_today) * 100 if close_today > 0 else 0.0
+              last_date = divs.index[-1]
+              ex_date_str = last_date.strftime('%d/%m/%Y')
+
+              dividend_data.append({
+                  'name': search_term,
+                  'div_rate': div_rate,
+                  'yield_pct': yield_pct,
+                  'ex_date': ex_date_str,
+                  'currency': currency,
+              })
         except Exception as div_err:
-          print(f'[{ticker}] Error procesando dividendo: {div_err}')
-
-        if div_rate and div_rate > 0:
-          dividend_data.append({
-              'name': search_term,
-              'div_rate': div_rate,
-              'yield_pct': yield_pct,
-              'ex_date': ex_date_str,
-              'currency': currency,
-          })
+          print(f'Error procesando dividendo para {ticker}: {div_err}')
 
       # --- LÓGICA 1: Alertas individuales en tiempo real ---
       is_big_price_move = abs(price_change) >= 1.5
