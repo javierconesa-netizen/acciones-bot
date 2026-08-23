@@ -16,7 +16,7 @@ TICKERS = [
     'KO',
     'NFLX',
     'MC.PA',
-    'NVO',
+    'NOV.DE',  # <--- Cambiado de NVO a NOV.DE (Xetra)
     'ACHR',
     'TSM',
     'OPEN',
@@ -34,7 +34,11 @@ TICKERS = [
     'BTC-USD',
 ]
 
-NAMES = {'MC.PA': 'LVMH', 'BTC-USD': 'Bitcoin'}
+NAMES = {
+    'MC.PA': 'LVMH',
+    'BTC-USD': 'Bitcoin',
+    'NOV.DE': 'Novo Nordisk',  # <--- Nombre limpio para NOV.DE
+}
 SEEN_NEWS_FILE = 'seen_news.json'
 
 
@@ -107,14 +111,10 @@ def check_all_news():
 
 
 def check_market():
-  # Hora y fecha exacta de España
   tz_spain = pytz.timezone('Europe/Madrid')
   now_spain = datetime.now(tz_spain)
 
-  # Detectar si le has dado tú al botón manual en GitHub
   is_manual_run = os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch'
-
-  # El resumen se enviará si son las 22:00 (automático) O si le das al botón manual
   is_closing_time = (
       now_spain.hour == 22 and now_spain.minute < 15
   ) or is_manual_run
@@ -145,7 +145,6 @@ def check_market():
       avg_volume = hist['Volume'][:-1].mean() if len(hist) > 1 else vol_today
       price_change = ((close_today - close_prev) / close_prev) * 100
 
-      # --- LÓGICA 1: Alertas individuales en tiempo real ---
       is_big_price_move = abs(price_change) >= 1.5
 
       vol_label = ''
@@ -172,7 +171,6 @@ def check_market():
         )
         send_alert_telegram(msg)
 
-      # --- LÓGICA 2: Datos para el resumen ordenado ---
       if is_closing_time:
         summary_data.append(
             {
@@ -185,7 +183,6 @@ def check_market():
     except Exception as e:
       print(f'Error procesando {ticker}: {e}')
 
-  # Enviar resumen ordenado de mayor a menor subida
   if is_closing_time and summary_data:
     summary_data.sort(key=lambda x: x['change'], reverse=True)
     for item in summary_data:
