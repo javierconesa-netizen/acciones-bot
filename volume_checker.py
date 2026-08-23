@@ -259,7 +259,7 @@ def check_market():
     except Exception as e:
       print(f'Error procesando {ticker}: {e}')
 
-  # --- ENVÍOS A CADA TEMA (Sin restricciones horarias si se lanza manual) ---
+  # --- ENVÍOS A CADA TEMA ---
   if summary_data:
     summary_data.sort(key=lambda x: x['change'], reverse=True)
     for item in summary_data:
@@ -285,25 +285,48 @@ def check_market():
       earnings_lines.append(f'• *{item["name"]}*: `{item["date"]}`')
     send_telegram('\n'.join(earnings_lines), thread_id=EARNINGS_THREAD_ID)
 
+  # Análisis Técnico ordenado de mayor a menor RSI
   if technical_data:
+    technical_data.sort(key=lambda x: x['rsi'], reverse=True)
     for item in technical_data:
       technical_lines.append(
           f"• *{item['name']}* - RSI: `{item['rsi']:.1f}` ({item['rsi_label']})"
       )
     send_telegram('\n'.join(technical_lines), thread_id=TECHNICAL_THREAD_ID)
 
-  # Índice de Miedo y Codicia (Fear & Greed)
+  # Índice de Miedo y Codicia traducido y ampliado
   try:
     fng_res = requests.get(
         'https://api.alternative.me/fng/?limit=1', timeout=10
     ).json()
-    fng_val = fng_res['data'][0]['value']
-    fng_class = fng_res['data'][0]['value_classification']
+    fng_val = int(fng_res['data'][0]['value'])
+    fng_class_en = fng_res['data'][0]['value_classification']
+
+    # Traducción al español y comentarios de contexto
+    translations = {
+        'Extreme Fear': (
+            'Miedo Extremo 😱 (Zona de pánico, históricamente oportunidad de'
+            ' compra)'
+        ),
+        'Fear': 'Miedo 😨 (Sentimiento de precaución o bajista en el mercado)',
+        'Neutral': (
+            'Neutral 😐 (Equilibrio, sin tendencia clara de sentimiento)'
+        ),
+        'Greed': (
+            'Codicia 🟢 (Optimismo y presión compradora predominante)'
+        ),
+        'Extreme Greed': (
+            'Codicia Extrema 🚀 (Euforia en el mercado, atención a posibles'
+            ' correcciones)'
+        ),
+    }
+    fng_class_es = translations.get(fng_class_en, fng_class_en)
+
     fng_msg = (
         '📉 *Índice de Miedo y Codicia* 📉\n'
         f'📅 *Fecha:* {now_spain.strftime("%d/%m/%Y")}\n\n'
         f'• *Valor:* `{fng_val}/100`\n'
-        f'• *Sentimiento:* *{fng_class}*'
+        f'• *Sentimiento:* *{fng_class_es}*'
     )
     send_telegram(fng_msg, thread_id=FEAR_GREED_THREAD_ID)
   except Exception as e:
