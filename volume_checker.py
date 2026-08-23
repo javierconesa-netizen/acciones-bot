@@ -57,7 +57,8 @@ FALLBACK_DIVIDENDS = {
 
 SEEN_NEWS_FILE = 'seen_news.json'
 LAST_SUMMARY_FILE = 'last_summary.json'  # Control para el resumen diario
-LAST_ALERT_FILE = 'last_alert_prices.json'  # Control para evitar spam de alertas
+LAST_ALERT_FILE = 'last_alert_prices.json'  # Control para spam de precios
+LAST_VOLUME_FILE = 'last_alert_volumes.json'  # Control para spam de volumen
 
 session = requests.Session()
 session.headers['User-Agent'] = (
@@ -77,7 +78,7 @@ def send_telegram(message, thread_id=None):
     print(f'Error enviando mensaje a Telegram: {e}')
 
 
-# --- NOTICIAS (Se ejecuta cada 15 min y solo avisa si hay novedades) ---
+# --- NOTICIAS ---
 def check_all_news():
   seen_news = []
   if os.path.exists(SEEN_NEWS_FILE):
@@ -133,7 +134,7 @@ def check_market():
   now_spain = datetime.now(tz_spain)
   today_str = now_spain.strftime('%Y-%m-%d')
 
-  # Cargar precios de la última alerta para evitar spam
+  # Cargar memorias anti-spam
   last_alert_prices = {}
   if os.path.exists(LAST_ALERT_FILE):
     try:
@@ -141,8 +142,16 @@ def check_market():
         last_alert_prices = json.load(f)
     except Exception:
       pass
-
   updated_alerts = last_alert_prices.copy()
+
+  last_alert_volumes = {}
+  if os.path.exists(LAST_VOLUME_FILE):
+    try:
+      with open(LAST_VOLUME_FILE, 'r') as f:
+        last_alert_volumes = json.load(f)
+    except Exception:
+      pass
+  updated_volumes = last_alert_volumes.copy()
 
   summary_data = []
   dividend_data = []
@@ -186,7 +195,6 @@ def check_market():
       price_change = ((close_today - close_prev) / close_prev) * 100
       currency = '€' if ticker in ['MC.PA', 'NOV.DE'] else '$'
 
-      # Guardar datos para el resumen de cierre
       summary_data.append({
           'name': search_term,
           'price': close_today,
@@ -270,15 +278,8 @@ def check_market():
       except Exception:
         earnings_data.append({'name': search_term, 'date': 'No disponible'})
 
-      # --- ALERTAS EN TIEMPO REAL (Con filtro anti-spam) ---
+      # --- ALERTAS EN TIEMPO REAL (Con filtros anti-spam de 1% precio y 25% volumen) ---
       is_big_price_move = abs(price_change) >= 1.5
-      vol_label = ''
-      if avg_volume > 0:
-        if vol_today >= (avg_volume * 2.0):
-          vol_label = '🚨 *¡Volumen doblado (200%+ vs media)!*'
-        elif vol_today >= avg_volume:
-          vol_label = '⚠️ *¡Volumen al 100% de la media!*'
-
       should_alert_price = False
       if is_big_price_move:
         if ticker not in last_alert_prices:
@@ -288,10 +289,29 @@ def check_market():
           diff_from_last = (
               abs(close_today - last_price_alerted) / last_price_alerted
           ) * 100
-          if diff_from_last >= 1.0:  # 1% adicional de variación
+          if diff_from_last >= 1.0:
             should_alert_price = True
 
-      if should_alert_price or bool(vol_label):
+      should_alert_vol = False
+      vol_label = ''
+      if avg_volume > 0:
+        is_vol_high = vol_today >= avg_volume
+        if is_vol_high:
+          if ticker not in last_alert_volumes:
+            should_alert_vol = True
+          else:
+            last_vol_alerted = last_alert_volumes[ticker]
+            # Salta si el volumen actual es un 25% mayor que en el último aviso
+            if vol_today >= (last_vol_alerted * 1.25):
+              should_alert_vol = True
+
+      if should_alert_price or should_alert_vol:
+        if should_alert_vol:
+          if vol_today >= (avg_volume * 2.0):
+            vol_label = '🚨 *¡Volumen doblado (200%+ vs media)!*'
+          else:
+            vol_label = '⚠️ *¡Volumen al 100% de la media!*'
+
         msg = (
             f'📊 *Alerta Mercado: {search_term}*\n'
             f'• *Precio:* {currency}{close_today:.2f} ({price_change:+.2f}%)\n'
@@ -299,19 +319,23 @@ def check_market():
         )
         send_telegram(msg)
 
-        if is_big_price_move:
+        if is_big_price_move and should_alert_price:
           updated_alerts[ticker] = close_today
+        if should_alert_vol:
+          updated_volumes[ticker] = vol_today
 
     except Exception as e:
       print(f'Error procesando {ticker}: {e}')
 
-  # Guardar los precios de la última alerta
+  # Guardar memorias
   with open(LAST_ALERT_FILE, 'w') as f:
     json.dump(updated_alerts, f)
+  with open(LAST_VOLUME_FILE, 'w') as f:
+    json.dump(updated_volumes, f)
 
-  # --- RESUMEN DE CIERRE (Solo se envía una vez al día, a partir de las 22:00 hora España) ---
+  # --- RESUMEN DE CIERRE ---
   should_send_summary = False
-  if now_spain.hour >= 22:  # Tras el cierre de mercado de EE. UU.
+  if now_spain.hour >= 22:
     last_summary_date = ''
     if os.path.exists(LAST_SUMMARY_FILE):
       with open(LAST_SUMMARY_FILE, 'r') as f:
@@ -321,7 +345,6 @@ def check_market():
       should_send_summary = True
 
   if should_send_summary:
-    # 1. Enviar resumen de precios
     if summary_data:
       summary_data.sort(key=lambda x: x['change'], reverse=True)
       for item in summary_data:
@@ -332,7 +355,6 @@ def check_market():
         )
       send_telegram('\n'.join(summary_lines), thread_id=SUMMARY_THREAD_ID)
 
-    # 2. Enviar dividendos
     if dividend_data:
       now_date = now_spain.date()
       valid_dividends = []
@@ -367,7 +389,6 @@ def check_market():
         )
       send_telegram('\n'.join(dividend_lines), thread_id=DIVIDENDS_THREAD_ID)
 
-    # 3. Enviar Earnings
     if earnings_data:
       earnings_data.sort(
           key=lambda x: (
@@ -379,7 +400,6 @@ def check_market():
         earnings_lines.append(f'• *{item["name"]}*: `{item["date"]}`')
       send_telegram('\n'.join(earnings_lines), thread_id=EARNINGS_THREAD_ID)
 
-    # 4. Enviar Análisis Técnico
     if technical_data:
       technical_data.sort(key=lambda x: x['rsi'], reverse=True)
       for item in technical_data:
@@ -388,7 +408,6 @@ def check_market():
         )
       send_telegram('\n'.join(technical_lines), thread_id=TECHNICAL_THREAD_ID)
 
-    # 5. Índice de Miedo y Codicia
     try:
       fng_res = requests.get(
           'https://api.alternative.me/fng/?limit=1', timeout=10
@@ -397,23 +416,11 @@ def check_market():
       fng_class_en = fng_res['data'][0]['value_classification']
 
       translations = {
-          'Extreme Fear': (
-              'Miedo Extremo 😱 (Zona de pánico, históricamente oportunidad de'
-              ' compra)'
-          ),
-          'Fear': (
-              'Miedo 😨 (Sentimiento de precaución o bajista en el mercado)'
-          ),
-          'Neutral': (
-              'Neutral 😐 (Equilibrio, sin tendencia clara de sentimiento)'
-          ),
-          'Greed': (
-              'Codicia 🟢 (Optimismo y presión compradora predominante)'
-          ),
-          'Extreme Greed': (
-              'Codicia Extrema 🚀 (Euforia en el mercado, atención a posibles'
-              ' correcciones)'
-          ),
+          'Extreme Fear': 'Miedo Extremo 😱',
+          'Fear': 'Miedo 😨',
+          'Neutral': 'Neutral 😐',
+          'Greed': 'Codicia 🟢',
+          'Extreme Greed': 'Codicia Extrema 🚀',
       }
       fng_class_es = translations.get(fng_class_en, fng_class_en)
 
@@ -427,7 +434,6 @@ def check_market():
     except Exception as e:
       print(f'Error obteniendo Fear & Greed: {e}')
 
-    # Guardar que ya se envió el resumen de hoy
     with open(LAST_SUMMARY_FILE, 'w') as f:
       json.dump(today_str, f)
 
