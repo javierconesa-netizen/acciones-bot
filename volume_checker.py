@@ -8,6 +8,9 @@ import yfinance as yf
 TELEGRAM_TOKEN = os.environ['TELEGRAM_TOKEN']
 CHAT_ID = os.environ['CHAT_ID']
 
+# ID del tema "Precio de cierre" extraído de tu captura
+SUMMARY_THREAD_ID = 137
+
 TICKERS = [
     'KO',
     'NFLX',
@@ -35,7 +38,7 @@ NAMES = {'MC.PA': 'LVMH', 'BTC-USD': 'Bitcoin'}
 SEEN_NEWS_FILE = 'seen_news.json'
 
 
-# 1. Alertas de precios -> Va al chat general (Acciones cartera, pestaña 1)
+# 1. Alertas de precios individuales -> Va al chat general (Acciones cartera)
 def send_alert_telegram(message):
   url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
   payload = {
@@ -46,14 +49,26 @@ def send_alert_telegram(message):
   requests.post(url, json=payload)
 
 
-# 2. Noticias -> Va al Tema 3 (Noticias Cartera)
+# 2. Resumen ordenado de cierre -> Va al Tema "Precio de cierre" (ID: 137)
+def send_summary_telegram(message):
+  url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
+  payload = {
+      'chat_id': CHAT_ID,
+      'text': message,
+      'parse_mode': 'Markdown',
+      'message_thread_id': SUMMARY_THREAD_ID,
+  }
+  requests.post(url, json=payload)
+
+
+# 3. Noticias -> Va al Tema 3 (Noticias Cartera)
 def send_news_telegram(message):
   url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
   payload = {
       'chat_id': CHAT_ID,
       'text': message,
       'parse_mode': 'Markdown',
-      'message_thread_id': 3,  # Tema 3: Noticias Cartera
+      'message_thread_id': 3,
   }
   requests.post(url, json=payload)
 
@@ -92,10 +107,14 @@ def check_all_news():
 
 
 def check_market():
+  summary_data = []
+  summary_lines = [
+      '📊 *Resumen Cierre de Mercado* 📊',
+      f'📅 *Fecha:* {datetime.now().strftime("%d/%m/%Y")}\n',
+  ]
+
   for ticker in TICKERS:
-    search_term = NAMES.get(
-        ticker, ticker
-    )  # Traduce MC.PA a LVMH y BTC-USD a Bitcoin
+    search_term = NAMES.get(ticker, ticker)
     try:
       stock = yf.Ticker(ticker)
       hist = stock.history(period='10d')
@@ -113,6 +132,7 @@ def check_market():
       avg_volume = hist['Volume'][:-1].mean() if len(hist) > 1 else vol_today
       price_change = ((close_today - close_prev) / close_prev) * 100
 
+      # --- Alertas individuales durante el día ---
       is_big_price_move = abs(price_change) >= 1.5
 
       vol_label = ''
@@ -138,8 +158,33 @@ def check_market():
             f'{"🚨 *¡Movimiento de precio del 1.5% o más!*" if is_big_price_move else ""}'
         )
         send_alert_telegram(msg)
+
+      # --- Recopilar datos para el resumen ordenado de las 22:00 ---
+      summary_data.append(
+          {
+              'name': search_term,
+              'price': close_today,
+              'change': price_change,
+          }
+      )
+
     except Exception as e:
       print(f'Error procesando {ticker}: {e}')
+
+  # Ordenar de mayor a menor porcentaje de subida
+  summary_data.sort(key=lambda x: x['change'], reverse=True)
+
+  # Añadir las líneas ordenadas al mensaje final
+  for item in summary_data:
+    emoji = '🟢' if item['change'] >= 0 else '🔴'
+    summary_lines.append(
+        f"{emoji} *{item['name']}*: ${item['price']:.2f}"
+        f" (`{item['change']:+.2f}%`)"
+    )
+
+  # Enviar el resumen unificado al tema 137
+  full_summary = '\n'.join(summary_lines)
+  send_summary_telegram(full_summary)
 
 
 if __name__ == '__main__':
