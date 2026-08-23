@@ -34,17 +34,19 @@ NAMES = {'MC.PA': 'LVMH', 'BTC-USD': 'Bitcoin'}
 SEEN_NEWS_FILE = 'seen_news.json'
 
 
+# 1. Alertas de precios -> Va al chat general (Acciones cartera, pestaña 1)
 def send_alert_telegram(message):
   url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
   payload = {
       'chat_id': CHAT_ID,
       'text': message,
       'parse_mode': 'Markdown',
-      'message_thread_id': 1,  # Tema 1: Acciones cartera
+      # Omitimos message_thread_id para que caiga correctamente en el chat general (pestaña 1)
   }
   requests.post(url, json=payload)
 
 
+# 2. Noticias -> Va al Tema 3 (Noticias Cartera)
 def send_news_telegram(message):
   url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
   payload = {
@@ -90,12 +92,6 @@ def check_all_news():
 
 
 def check_market():
-  # 🧪 MENSAJE DE PRUEBA TEMPORAL
-  send_alert_telegram(
-      '🧪 *PRUEBA:* Comprobando que el Tema 1 (Acciones cartera) recibe mensajes'
-      ' correctamente.'
-  )
-
   for ticker in TICKERS:
     try:
       stock = yf.Ticker(ticker)
