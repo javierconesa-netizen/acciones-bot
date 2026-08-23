@@ -2,6 +2,7 @@ from datetime import datetime
 import json
 import os
 import xml.etree.ElementTree as ET
+import pandas as pd
 import pytz
 import requests
 import yfinance as yf
@@ -156,7 +157,6 @@ def check_market():
   for ticker in TICKERS:
     search_term = NAMES.get(ticker, ticker)
     try:
-      # Pasamos la sesión para saltarnos el bloqueo de Yahoo
       stock = yf.Ticker(ticker, session=session)
       hist = stock.history(period='10d')
 
@@ -175,25 +175,52 @@ def check_market():
 
       currency = '€' if ticker in ['MC.PA', 'NOV.DE'] else '$'
 
-      # --- RECOGIDA Y CÁLCULO DE DIVIDENDOS ---
-      info = stock.info
-      div_rate = info.get('dividendRate')
-      div_yield = info.get('dividendYield')  # Ej: 0.0315 -> 3.15%
-      ex_div_timestamp = info.get('exDividendDate')
-
-      if div_rate and div_rate > 0:
-        yield_pct = (
-            (div_yield * 100)
-            if div_yield
-            else ((div_rate / close_today) * 100 if close_today > 0 else 0.0)
-        )
-
+      # --- RECOGIDA ROBUSTA DE DIVIDENDOS (INFO + FALLBACK HISTÓRICO) ---
+      if is_closing_time:
+        div_rate = None
         ex_date_str = 'No disponible'
-        if ex_div_timestamp:
-          ex_date_obj = datetime.fromtimestamp(ex_div_timestamp, tz=tz_spain)
-          ex_date_str = ex_date_obj.strftime('%d/%m/%Y')
+        yield_pct = 0.0
 
-        if is_closing_time:
+        try:
+          info = stock.info
+          div_rate = info.get('dividendRate')
+          div_yield = info.get('dividendYield')
+          ex_div_timestamp = info.get('exDividendDate')
+
+          if div_rate and div_rate > 0:
+            yield_pct = (
+                (div_yield * 100)
+                if div_yield
+                else ((div_rate / close_today) * 100 if close_today > 0 else 0.0)
+            )
+            if ex_div_timestamp:
+              ex_date_obj = datetime.fromtimestamp(
+                  ex_div_timestamp, tz=tz_spain
+              )
+              ex_date_str = ex_date_obj.strftime('%d/%m/%Y')
+          else:
+            # Fallback al historial de pagos si info falla o viene vacío
+            divs = stock.dividends
+            if not divs.empty:
+              one_year_ago = pd.Timestamp.now(tz=tz_spain) - pd.DateOffset(
+                  years=1
+              )
+              recent_divs = divs[divs.index >= one_year_ago]
+              div_rate = recent_divs.sum()
+              if div_rate and div_rate > 0:
+                yield_pct = (
+                    (div_rate / close_today) * 100 if close_today > 0 else 0.0
+                )
+                last_date = divs.index[-1]
+                ex_date_str = last_date.strftime('%d/%m/%Y')
+                print(
+                    f'[{ticker}] Dividendo obtenido por historial:'
+                    f' {div_rate}'
+                )
+        except Exception as div_err:
+          print(f'[{ticker}] Error procesando dividendo: {div_err}')
+
+        if div_rate and div_rate > 0:
           dividend_data.append({
               'name': search_term,
               'div_rate': div_rate,
