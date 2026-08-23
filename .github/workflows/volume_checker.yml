@@ -33,4 +33,5 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: "Update volume alerts cache"
-          file_patterns: last_market_alerts.json
+          file_pattern: seen_news.json
+          
