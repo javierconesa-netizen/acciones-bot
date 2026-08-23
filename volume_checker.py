@@ -16,7 +16,7 @@ TICKERS = [
     'KO',
     'NFLX',
     'MC.PA',
-    'NOV.DE',  # <--- Cambiado de NVO a NOV.DE (Xetra)
+    'NOV.DE',
     'ACHR',
     'TSM',
     'OPEN',
@@ -37,7 +37,7 @@ TICKERS = [
 NAMES = {
     'MC.PA': 'LVMH',
     'BTC-USD': 'Bitcoin',
-    'NOV.DE': 'Novo Nordisk',  # <--- Nombre limpio para NOV.DE
+    'NOV.DE': 'Novo Nordisk',
 }
 SEEN_NEWS_FILE = 'seen_news.json'
 
@@ -145,6 +145,10 @@ def check_market():
       avg_volume = hist['Volume'][:-1].mean() if len(hist) > 1 else vol_today
       price_change = ((close_today - close_prev) / close_prev) * 100
 
+      # Asignar símbolo de moneda correcto (€ para europeas, $ para el resto)
+      currency = '€' if ticker in ['MC.PA', 'NOV.DE'] else '$'
+
+      # --- LÓGICA 1: Alertas individuales en tiempo real ---
       is_big_price_move = abs(price_change) >= 1.5
 
       vol_label = ''
@@ -163,7 +167,7 @@ def check_market():
       if is_big_price_move or is_volume_triggered:
         msg = (
             f'📊 *Alerta Mercado: {search_term}*\n'
-            f'• *Precio:* ${close_today:.2f} ({price_change:+.2f}%)\n'
+            f'• *Precio:* {currency}{close_today:.2f} ({price_change:+.2f}%)\n'
             f'• *Volumen hoy:* {vol_today:,.0f}\n'
             f'• *Volumen medio:* {avg_volume:,.0f}\n'
             f'{vol_label if vol_label else ""}\n'
@@ -171,24 +175,27 @@ def check_market():
         )
         send_alert_telegram(msg)
 
+      # --- LÓGICA 2: Datos para el resumen ordenado ---
       if is_closing_time:
         summary_data.append(
             {
                 'name': search_term,
                 'price': close_today,
                 'change': price_change,
+                'currency': currency,
             }
         )
 
     except Exception as e:
       print(f'Error procesando {ticker}: {e}')
 
+  # Enviar resumen ordenado de mayor a menor subida con su divisa correcta
   if is_closing_time and summary_data:
     summary_data.sort(key=lambda x: x['change'], reverse=True)
     for item in summary_data:
       emoji = '🟢' if item['change'] >= 0 else '🔴'
       summary_lines.append(
-          f"{emoji} *{item['name']}*: ${item['price']:.2f}"
+          f"{emoji} *{item['name']}*: {item['currency']}{item['price']:.2f}"
           f" (`{item['change']:+.2f}%`)"
       )
 
