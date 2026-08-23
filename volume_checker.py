@@ -2,13 +2,14 @@ from datetime import datetime
 import json
 import os
 import xml.etree.ElementTree as ET
+import pytz
 import requests
 import yfinance as yf
 
 TELEGRAM_TOKEN = os.environ['TELEGRAM_TOKEN']
 CHAT_ID = os.environ['CHAT_ID']
 
-# ID del tema "Precio de cierre" extraído de tu captura
+# ID del tema "Precio de cierre"
 SUMMARY_THREAD_ID = 137
 
 TICKERS = [
@@ -33,12 +34,11 @@ TICKERS = [
     'BTC-USD',
 ]
 
-# Nombres limpios para las alertas y noticias
 NAMES = {'MC.PA': 'LVMH', 'BTC-USD': 'Bitcoin'}
 SEEN_NEWS_FILE = 'seen_news.json'
 
 
-# 1. Alertas de precios individuales -> Va al chat general (Acciones cartera)
+# 1. Alertas individuales -> Chat general (Acciones cartera)
 def send_alert_telegram(message):
   url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
   payload = {
@@ -49,7 +49,7 @@ def send_alert_telegram(message):
   requests.post(url, json=payload)
 
 
-# 2. Resumen ordenado de cierre -> Va al Tema "Precio de cierre" (ID: 137)
+# 2. Resumen ordenado de cierre -> Tema "Precio de cierre" (ID: 137)
 def send_summary_telegram(message):
   url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
   payload = {
@@ -61,7 +61,7 @@ def send_summary_telegram(message):
   requests.post(url, json=payload)
 
 
-# 3. Noticias -> Va al Tema 3 (Noticias Cartera)
+# 3. Noticias -> Tema 3 (Noticias Cartera)
 def send_news_telegram(message):
   url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
   payload = {
@@ -107,10 +107,18 @@ def check_all_news():
 
 
 def check_market():
+  # Hora y fecha exacta de España
+  tz_spain = pytz.timezone('Europe/Madrid')
+  now_spain = datetime.now(tz_spain)
+
+  # Control para el cierre (de 22:00 a 22:15 hora española)
+  is_closing_time = now_spain.hour == 22 and now_spain.minute < 15
+
   summary_data = []
   summary_lines = [
       '📊 *Resumen Cierre de Mercado* 📊',
-      f'📅 *Fecha:* {datetime.now().strftime("%d/%m/%Y")}\n',
+      f'📅 *Fecha:* {now_spain.strftime("%d/%m/%Y")}',
+      f'🕒 *Hora:* {now_spain.strftime("%H:%M:%S")}\n',  # <--- Hora de consulta añadida
   ]
 
   for ticker in TICKERS:
@@ -132,7 +140,7 @@ def check_market():
       avg_volume = hist['Volume'][:-1].mean() if len(hist) > 1 else vol_today
       price_change = ((close_today - close_prev) / close_prev) * 100
 
-      # --- Alertas individuales durante el día ---
+      # --- LÓGICA 1: Alertas individuales en tiempo real ---
       is_big_price_move = abs(price_change) >= 1.5
 
       vol_label = ''
@@ -159,32 +167,31 @@ def check_market():
         )
         send_alert_telegram(msg)
 
-      # --- Recopilar datos para el resumen ordenado de las 22:00 ---
-      summary_data.append(
-          {
-              'name': search_term,
-              'price': close_today,
-              'change': price_change,
-          }
-      )
+      # --- LÓGICA 2: Datos para el resumen ordenado de las 22:00 ---
+      if is_closing_time:
+        summary_data.append(
+            {
+                'name': search_term,
+                'price': close_today,
+                'change': price_change,
+            }
+        )
 
     except Exception as e:
       print(f'Error procesando {ticker}: {e}')
 
-  # Ordenar de mayor a menor porcentaje de subida
-  summary_data.sort(key=lambda x: x['change'], reverse=True)
+  # Enviar resumen ordenado de mayor a menor subida a las 22:00
+  if is_closing_time and summary_data:
+    summary_data.sort(key=lambda x: x['change'], reverse=True)
+    for item in summary_data:
+      emoji = '🟢' if item['change'] >= 0 else '🔴'
+      summary_lines.append(
+          f"{emoji} *{item['name']}*: ${item['price']:.2f}"
+          f" (`{item['change']:+.2f}%`)"
+      )
 
-  # Añadir las líneas ordenadas al mensaje final
-  for item in summary_data:
-    emoji = '🟢' if item['change'] >= 0 else '🔴'
-    summary_lines.append(
-        f"{emoji} *{item['name']}*: ${item['price']:.2f}"
-        f" (`{item['change']:+.2f}%`)"
-    )
-
-  # Enviar el resumen unificado al tema 137
-  full_summary = '\n'.join(summary_lines)
-  send_summary_telegram(full_summary)
+    full_summary = '\n'.join(summary_lines)
+    send_summary_telegram(full_summary)
 
 
 if __name__ == '__main__':
