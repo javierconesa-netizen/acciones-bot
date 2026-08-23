@@ -2,7 +2,7 @@ name: Volume and Price Checker
 
 on:
   schedule:
-    - cron: '*/15 * * * *'  # Se ejecuta cada 15 minutos, todos los días del año (24/7)
+    - cron: '*/15 * * * *'  # Sigue ejecutándose cada 15 min para alertas y noticias
   workflow_dispatch:
 
 permissions:
@@ -21,7 +21,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install requests yfinance pandas
+        run: pip install requests yfinance pandas pytz  # <--- ¡Añadido pytz aquí!
 
       - name: Run script
         env:
@@ -34,4 +34,3 @@ jobs:
         with:
           commit_message: "Update volume alerts cache"
           file_pattern: seen_news.json
-          
