@@ -199,7 +199,7 @@ def check_market():
             'currency': currency,
         })
 
-      # 3. Análisis Técnico (RSI)
+      # 3. Análisis Técnico (RSI) con Normal en Naranja
       try:
         delta = hist['Close'].diff()
         gain = delta.where(delta > 0, 0.0)
@@ -210,7 +210,7 @@ def check_market():
         rsi = 100 - (100 / (1 + rs))
         current_rsi = rsi.iloc[-1]
 
-        rsi_label = '🟢 Normal'
+        rsi_label = '🟠 Normal'
         if current_rsi > 70:
           rsi_label = '🔴 Sobrecompra (>70)'
         elif current_rsi < 30:
@@ -280,7 +280,6 @@ def check_market():
       )
     send_telegram('\n'.join(dividend_lines), thread_id=DIVIDENDS_THREAD_ID)
 
-  # Earnings ordenados por fecha (fechas válidas primero, luego sin programar)
   if earnings_data:
     earnings_data.sort(
         key=lambda x: (
@@ -292,7 +291,6 @@ def check_market():
       earnings_lines.append(f'• *{item["name"]}*: `{item["date"]}`')
     send_telegram('\n'.join(earnings_lines), thread_id=EARNINGS_THREAD_ID)
 
-  # Análisis Técnico ordenado de mayor a menor RSI (Sobrecompra arriba, sobreventa abajo)
   if technical_data:
     technical_data.sort(key=lambda x: x['rsi'], reverse=True)
     for item in technical_data:
