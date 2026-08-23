@@ -43,6 +43,13 @@ NAMES = {
 }
 SEEN_NEWS_FILE = 'seen_news.json'
 
+# Sesión personalizada para evitar bloqueos de Yahoo Finance
+session = requests.Session()
+session.headers['User-Agent'] = (
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like'
+    ' Gecko) Chrome/120.0.0.0 Safari/537.36'
+)
+
 
 # 1. Alertas individuales -> Chat general (Acciones cartera)
 def send_alert_telegram(message):
@@ -150,7 +157,7 @@ def check_market():
   for ticker in TICKERS:
     search_term = NAMES.get(ticker, ticker)
     try:
-      stock = yf.Ticker(ticker)
+      stock = yf.Ticker(ticker, session=session)
       hist = stock.history(period='10d')
 
       if len(hist) < 2:
@@ -168,25 +175,23 @@ def check_market():
 
       currency = '€' if ticker in ['MC.PA', 'NOV.DE'] else '$'
 
-      # --- OBTENCIÓN ROBUSTA DE DIVIDENDOS SIN CONFLICTOS DE ZONA HORARIA ---
+      # --- OBTENCIÓN ROBUSTA DE DIVIDENDOS (CORREGIDO) ---
       if is_closing_time:
         try:
           divs = stock.dividends
           if divs is not None and not divs.empty:
-            
-            # 1. Quitamos la zona horaria del índice de dividendos para poder compararlo
+            # Corregido: usamos tz_localize(None) en lugar de tz_convert(None)
             if divs.index.tz is not None:
-                divs.index = divs.index.tz_convert(None)
-            
-            # 2. Creamos la fecha de "hace un año" sin zona horaria
+              divs.index = divs.index.tz_localize(None)
+
             one_year_ago = datetime.utcnow() - pd.DateOffset(years=1)
-            
-            # 3. Filtramos los dividendos de los últimos 365 días
             recent_divs = divs[divs.index >= one_year_ago]
             div_rate = recent_divs.sum()
 
             if div_rate > 0:
-              yield_pct = (div_rate / close_today) * 100 if close_today > 0 else 0.0
+              yield_pct = (
+                  (div_rate / close_today) * 100 if close_today > 0 else 0.0
+              )
               last_date = divs.index[-1]
               ex_date_str = last_date.strftime('%d/%m/%Y')
 
