@@ -2,7 +2,7 @@ name: Volume and Price Checker
 
 on:
   schedule:
-    - cron: '0 21 * * 1-5'
+    - cron: '*/15 * * * *'  # Se ejecuta cada 15 minutos, todos los días del año (24/7)
   workflow_dispatch:
 
 permissions:
