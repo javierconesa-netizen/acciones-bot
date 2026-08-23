@@ -14,7 +14,6 @@ TICKERS = [
     "SLNH", "RZLV", "LAES", "BTC-USD"
 ]
 
-ALERT_FILE = 'last_market_alerts.json'
 SEEN_NEWS_FILE = 'seen_btc_news.json'
 
 def send_telegram(message):
@@ -51,16 +50,6 @@ def check_crypto_news():
         print(f"Error buscando noticias de BTC: {e}")
 
 def check_market():
-    today_str = datetime.now().strftime('%Y-%m-%d')
-    
-    alerts_sent = {}
-    if os.path.exists(ALERT_FILE):
-        with open(ALERT_FILE, 'r') as f:
-            alerts_sent = json.load(f)
-            
-    if today_str not in alerts_sent:
-        alerts_sent[today_str] = []
-
     for ticker in TICKERS:
         try:
             stock = yf.Ticker(ticker)
@@ -79,27 +68,33 @@ def check_market():
             avg_volume = hist['Volume'][:-1].mean() if len(hist) > 1 else vol_today
             price_change = ((close_today - close_prev) / close_prev) * 100
             
-            is_unusual_volume = vol_today > (avg_volume * 2) if avg_volume > 0 else False
-            is_big_price_move = abs(price_change) > 5.0
+            # Condiciones de precio y volumen escalonadas
+            is_big_price_move = abs(price_change) >= 1.5
             
-            identifier = f"{ticker}_{today_str}"
+            vol_label = ""
+            if avg_volume > 0:
+                if vol_today >= (avg_volume * 2.0):
+                    vol_label = "🚨 *¡Volumen doblado (200%+ vs media)!*"
+                elif vol_today >= avg_volume:
+                    vol_label = "⚠️ *¡Volumen ha alcanzado el 100% de la media diaria!*"
+                elif vol_today >= (avg_volume * 0.5):
+                    vol_label = "ℹ️ *¡Volumen ya ha llegado a la mitad (50%) de la media!*"
+
+            is_volume_triggered = bool(vol_label)
             
-            if (is_unusual_volume or is_big_price_move) and identifier not in alerts_sent[today_str]:
+            if is_big_price_move or is_volume_triggered:
                 msg = (
                     f"📊 *Alerta Mercado: {ticker}*\n"
                     f"• *Precio:* ${close_today:.2f} ({price_change:+.2f}%)\n"
                     f"• *Volumen hoy:* {vol_today:,.0f}\n"
                     f"• *Volumen medio:* {avg_volume:,.0f}\n"
-                    f"{'🚨 *¡Movimiento o volumen inusual!*' if is_unusual_volume or is_big_price_move else ''}"
+                    f"{vol_label if vol_label else ''}\n"
+                    f"{'🚨 *¡Movimiento de precio del 1.5% o más!*' if is_big_price_move else ''}"
                 )
                 send_telegram(msg)
-                alerts_sent[today_str].append(identifier)
                 
         except Exception as e:
             print(f"Error procesando {ticker}: {e}")
-            
-    with open(ALERT_FILE, 'w') as f:
-        json.dump(alerts_sent, f)
 
 if __name__ == "__main__":
     check_market()
