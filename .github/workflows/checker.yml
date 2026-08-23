@@ -33,4 +33,5 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: "Update filings cache state"
-          file_patterns: seen_filings.json
+          file_pattern: seen_filings.json
+          
