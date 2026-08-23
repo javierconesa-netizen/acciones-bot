@@ -2,7 +2,7 @@ name: SEC Filings Checker
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '*/15 * * * *'  # Se ejecuta cada 15 minutos
   workflow_dispatch:
 
 permissions:
