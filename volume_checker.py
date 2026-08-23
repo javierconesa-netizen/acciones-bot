@@ -39,10 +39,12 @@ TICKERS = [
     'BTC-USD',
 ]
 
+# Nombres específicos para evitar confusiones en las noticias (ej. OPEN con el US Open de tenis)
 NAMES = {
     'MC.PA': 'LVMH',
     'BTC-USD': 'Bitcoin',
     'NOV.DE': 'Novo Nordisk',
+    'OPEN': 'Opendoor Technologies',
 }
 
 FALLBACK_DIVIDENDS = {
@@ -75,12 +77,25 @@ def send_telegram(message, thread_id=None):
     print(f'Error enviando mensaje a Telegram: {e}')
 
 
-# --- NOTICIAS ---
+# --- NOTICIAS (Con filtro anti-deportes/basura) ---
 def check_all_news():
   seen_news = []
   if os.path.exists(SEEN_NEWS_FILE):
     with open(SEEN_NEWS_FILE, 'r') as f:
       seen_news = json.load(f)
+
+  # Palabras clave para descartar noticias que no sean de bolsa/financieras
+  forbidden_words = [
+      'tenis',
+      'alcaraz',
+      'williams',
+      'us open',
+      'partido',
+      'torneo',
+      'enfrentamiento',
+      'deporte',
+      'fútbol',
+  ]
 
   for ticker in TICKERS:
     search_term = NAMES.get(ticker, ticker)
@@ -96,6 +111,13 @@ def check_all_news():
           if title_elem is not None and link_elem is not None:
             title = title_elem.text
             link = link_elem.text
+
+            # Comprobar si la noticia contiene alguna palabra prohibida (ej. deportes)
+            title_lower = title.lower()
+            if any(fw in title_lower for fw in forbidden_words):
+              print(f'Noticia descartada por filtro de contenido: {title}')
+              continue
+
             news_id = f'{ticker}_{title}'
 
             if news_id not in seen_news:
