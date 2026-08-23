@@ -280,12 +280,19 @@ def check_market():
       )
     send_telegram('\n'.join(dividend_lines), thread_id=DIVIDENDS_THREAD_ID)
 
+  # Earnings ordenados por fecha (fechas válidas primero, luego sin programar)
   if earnings_data:
+    earnings_data.sort(
+        key=lambda x: (
+            0 if (x['date'] and x['date'][0].isdigit()) else 1,
+            x['date'],
+        )
+    )
     for item in earnings_data:
       earnings_lines.append(f'• *{item["name"]}*: `{item["date"]}`')
     send_telegram('\n'.join(earnings_lines), thread_id=EARNINGS_THREAD_ID)
 
-  # Análisis Técnico ordenado de mayor a menor RSI
+  # Análisis Técnico ordenado de mayor a menor RSI (Sobrecompra arriba, sobreventa abajo)
   if technical_data:
     technical_data.sort(key=lambda x: x['rsi'], reverse=True)
     for item in technical_data:
@@ -302,7 +309,6 @@ def check_market():
     fng_val = int(fng_res['data'][0]['value'])
     fng_class_en = fng_res['data'][0]['value_classification']
 
-    # Traducción al español y comentarios de contexto
     translations = {
         'Extreme Fear': (
             'Miedo Extremo 😱 (Zona de pánico, históricamente oportunidad de'
