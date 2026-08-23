@@ -10,7 +10,7 @@ CHAT_ID = os.environ['CHAT_ID']
 
 TICKERS = [
     "KO", "NFLX", "MC.PA", "NVO", "ACHR", "TSM", "OPEN", "NVDA", 
-    "IREN", "GOSS", "ASTS", "USEG", "ONDS", "RKLB", "GOOGL", 
+    "IREN", "GOSS", "ASTS", "BSIN", "ONDS", "RKLB", "GOOGL", 
     "SLNH", "RZLV", "LAES", "BTC-USD"
 ]
 
