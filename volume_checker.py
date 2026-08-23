@@ -13,7 +13,10 @@ TICKERS = [
     "IREN", "GOSS", "ASTS", "BSIN", "ONDS", "RKLB", "GOOGL", 
     "SLNH", "RZLV", "LAES", "BTC-USD"
 ]
-
+# Solo traducimos LVMH; el resto usará su ticker habitual
+NAMES = {
+    "MC.PA": "LVMH"
+}
 SEEN_NEWS_FILE = 'seen_btc_news.json'
 
 def send_telegram(message):
