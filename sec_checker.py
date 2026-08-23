@@ -16,7 +16,7 @@ CIKS = {
     "0001923483": "IREN Limited",
     "0001683416": "Gossamer Bio",
     "0001780312": "AST SpaceMobile",
-    "0000102312": "US Energy / Big Sky",
+    "0000102312": "Big Sky Industrial (BSIN)",
     "0001362747": "Ondas",
     "0001819994": "Rocket Lab USA",
     "0001652044": "Alphabet (Google)",
