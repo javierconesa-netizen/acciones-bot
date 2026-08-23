@@ -30,6 +30,7 @@ TICKERS = [
     'BTC-USD',
 ]
 
+# Nombres limpios para las alertas y noticias
 NAMES = {'MC.PA': 'LVMH', 'BTC-USD': 'Bitcoin'}
 SEEN_NEWS_FILE = 'seen_news.json'
 
@@ -41,7 +42,6 @@ def send_alert_telegram(message):
       'chat_id': CHAT_ID,
       'text': message,
       'parse_mode': 'Markdown',
-      # Omitimos message_thread_id para que caiga correctamente en el chat general (pestaña 1)
   }
   requests.post(url, json=payload)
 
@@ -93,6 +93,9 @@ def check_all_news():
 
 def check_market():
   for ticker in TICKERS:
+    search_term = NAMES.get(
+        ticker, ticker
+    )  # Traduce MC.PA a LVMH y BTC-USD a Bitcoin
     try:
       stock = yf.Ticker(ticker)
       hist = stock.history(period='10d')
@@ -127,7 +130,7 @@ def check_market():
 
       if is_big_price_move or is_volume_triggered:
         msg = (
-            f'📊 *Alerta Mercado: {ticker}*\n'
+            f'📊 *Alerta Mercado: {search_term}*\n'
             f'• *Precio:* ${close_today:.2f} ({price_change:+.2f}%)\n'
             f'• *Volumen hoy:* {vol_today:,.0f}\n'
             f'• *Volumen medio:* {avg_volume:,.0f}\n'
