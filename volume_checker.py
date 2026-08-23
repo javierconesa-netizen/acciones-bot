@@ -111,14 +111,19 @@ def check_market():
   tz_spain = pytz.timezone('Europe/Madrid')
   now_spain = datetime.now(tz_spain)
 
-  # Control para el cierre (de 22:00 a 22:15 hora española)
-  is_closing_time = now_spain.hour == 22 and now_spain.minute < 15
+  # Detectar si le has dado tú al botón manual en GitHub
+  is_manual_run = os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch'
+
+  # El resumen se enviará si son las 22:00 (automático) O si le das al botón manual
+  is_closing_time = (
+      now_spain.hour == 22 and now_spain.minute < 15
+  ) or is_manual_run
 
   summary_data = []
   summary_lines = [
       '📊 *Resumen Cierre de Mercado* 📊',
       f'📅 *Fecha:* {now_spain.strftime("%d/%m/%Y")}',
-      f'🕒 *Hora:* {now_spain.strftime("%H:%M:%S")}\n',  # <--- Hora de consulta añadida
+      f'🕒 *Hora:* {now_spain.strftime("%H:%M:%S")}\n',
   ]
 
   for ticker in TICKERS:
@@ -167,7 +172,7 @@ def check_market():
         )
         send_alert_telegram(msg)
 
-      # --- LÓGICA 2: Datos para el resumen ordenado de las 22:00 ---
+      # --- LÓGICA 2: Datos para el resumen ordenado ---
       if is_closing_time:
         summary_data.append(
             {
@@ -180,7 +185,7 @@ def check_market():
     except Exception as e:
       print(f'Error procesando {ticker}: {e}')
 
-  # Enviar resumen ordenado de mayor a menor subida a las 22:00
+  # Enviar resumen ordenado de mayor a menor subida
   if is_closing_time and summary_data:
     summary_data.sort(key=lambda x: x['change'], reverse=True)
     for item in summary_data:
