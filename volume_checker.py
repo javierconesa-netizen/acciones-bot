@@ -2,7 +2,6 @@ from datetime import datetime
 import json
 import os
 import xml.etree.ElementTree as ET
-import pandas as pd
 import pytz
 import requests
 import yfinance as yf
@@ -42,13 +41,6 @@ NAMES = {
     'NOV.DE': 'Novo Nordisk',
 }
 SEEN_NEWS_FILE = 'seen_news.json'
-
-# Sesión personalizada para evitar bloqueos de Yahoo Finance
-session = requests.Session()
-session.headers['User-Agent'] = (
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like'
-    ' Gecko) Chrome/120.0.0.0 Safari/537.36'
-)
 
 
 # 1. Alertas individuales -> Chat general (Acciones cartera)
@@ -150,14 +142,14 @@ def check_market():
   ]
 
   dividend_lines = [
-      '💰 *Calendario de Dividendos (Ordenado por Yield)* 💰',
+      '💰 *Calendario de Dividendos* 💰',
       f'📅 *Fecha:* {now_spain.strftime("%d/%m/%Y")}\n',
   ]
 
   for ticker in TICKERS:
     search_term = NAMES.get(ticker, ticker)
     try:
-      stock = yf.Ticker(ticker, session=session)
+      stock = yf.Ticker(ticker)
       hist = stock.history(period='10d')
 
       if len(hist) < 2:
@@ -175,35 +167,26 @@ def check_market():
 
       currency = '€' if ticker in ['MC.PA', 'NOV.DE'] else '$'
 
-      # --- OBTENCIÓN ROBUSTA DE DIVIDENDOS (CORREGIDO) ---
-      if is_closing_time:
-        try:
-          divs = stock.dividends
-          if divs is not None and not divs.empty:
-            # Corregido: usamos tz_localize(None) en lugar de tz_convert(None)
-            if divs.index.tz is not None:
-              divs.index = divs.index.tz_localize(None)
+      # --- RECOGIDA DE DATOS DE DIVIDENDOS ---
+      info = stock.info
+      div_rate = info.get('dividendRate')
+      ex_div_timestamp = info.get('exDividendDate')
 
-            one_year_ago = datetime.utcnow() - pd.DateOffset(years=1)
-            recent_divs = divs[divs.index >= one_year_ago]
-            div_rate = recent_divs.sum()
+      if div_rate and div_rate > 0:
+        ex_date_str = 'No disponible'
+        if ex_div_timestamp:
+          ex_date_obj = datetime.fromtimestamp(ex_div_timestamp, tz=tz_spain)
+          ex_date_str = ex_date_obj.strftime('%d/%m/%Y')
 
-            if div_rate > 0:
-              yield_pct = (
-                  (div_rate / close_today) * 100 if close_today > 0 else 0.0
-              )
-              last_date = divs.index[-1]
-              ex_date_str = last_date.strftime('%d/%m/%Y')
-
-              dividend_data.append({
+        if is_closing_time:
+          dividend_data.append(
+              {
                   'name': search_term,
                   'div_rate': div_rate,
-                  'yield_pct': yield_pct,
                   'ex_date': ex_date_str,
                   'currency': currency,
-              })
-        except Exception as div_err:
-          print(f'Error procesando dividendo para {ticker}: {div_err}')
+              }
+          )
 
       # --- LÓGICA 1: Alertas individuales en tiempo real ---
       is_big_price_move = abs(price_change) >= 1.5
@@ -232,14 +215,16 @@ def check_market():
         )
         send_alert_telegram(msg)
 
-      # --- LÓGICA 2: Datos para el resumen de precios ---
+      # --- LÓGICA 2: Datos para el resumen ordenado de precios ---
       if is_closing_time:
-        summary_data.append({
-            'name': search_term,
-            'price': close_today,
-            'change': price_change,
-            'currency': currency,
-        })
+        summary_data.append(
+            {
+                'name': search_term,
+                'price': close_today,
+                'change': price_change,
+                'currency': currency,
+            }
+        )
 
     except Exception as e:
       print(f'Error procesando {ticker}: {e}')
@@ -255,14 +240,12 @@ def check_market():
       )
     send_summary_telegram('\n'.join(summary_lines))
 
-  # Enviar resumen de dividendos al Tema 257 (ordenado de mayor a menor yield %)
+  # Enviar resumen independiente de dividendos al Tema 257
   if is_closing_time and dividend_data:
-    dividend_data.sort(key=lambda x: x['yield_pct'], reverse=True)
     for item in dividend_data:
       dividend_lines.append(
-          f"💵 *{item['name']}*: `{item['yield_pct']:.2f}%` anual"
-          f" ({item['currency']}{item['div_rate']:.2f}) | Ex-div:"
-          f" `{item['ex_date']}`"
+          f"• *{item['name']}*: {item['currency']}{item['div_rate']:.2f} anual"
+          f" (Ex-div: `{item['ex_date']}`)"
       )
     send_dividends_telegram('\n'.join(dividend_lines))
 
