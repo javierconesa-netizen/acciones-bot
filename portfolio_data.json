@@ -35,7 +35,8 @@
         "RKLB": "Rocket Lab",
         "SLNH": "Soluna Holdings",
         "RZLV": "Rezolve AI",
-        "LAES": "Sealsq / LAES"
+        "LAES": "Sealsq / LAES",
+        "MU": "Micron"
     },
     "portfolio_positions": {
         "KO": {
@@ -103,7 +104,7 @@
             "buy_price": 3.08
         },
         "BTC-USD": {
-            "shares": 0.021,
+            "shares": 0.021986,
             "buy_price": 70304.5
         }
     }
