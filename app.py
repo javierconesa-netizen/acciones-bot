@@ -329,7 +329,7 @@ if not df_main.empty:
         with col2:
             st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">📈 Valor Actual</h4><h2 style="color: #f0f6fc; font-size: 18px;">${total_current_value:,.2f} <span style="font-size: 14px; color: #8b949e; font-weight: normal;">(€{total_current_value_eur:,.2f})</span></h2></div>', unsafe_allow_html=True)
         with col3:
-            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">⚖️ Plusvalía Global</h4><h2 style="font-size: 18px;"><span style="color: {pl_color};">${total_pl:+,.2f} ({total_pl_pct:+.2f}%)</span> <span style="font-size: 14px; color: #8b949e; font-weight: normal;">(€{total_pl_eur:+,.2f})</span></h2></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">⚖️ Plusvalía Global</h4><h2 style="font-size: 18px;"><span style="color: {pl_color};">${total_pl:+,.2f} ({total_pl_pct:+.2f}%)</span> <span style="color: {pl_color}; font-size: 18px;">(€{total_pl_eur:+,.2f})</span></h2></div>', unsafe_allow_html=True)
     else:
         st.markdown(f'<div style="background: #131b2e; border: 1px solid #21262d; padding: 12px 16px; border-radius: 12px; margin-bottom: 15px; font-size: 14px; color: #8b949e;">📊 <b>Activos Totales en Seguimiento:</b> <span style="color: #f0f6fc; font-weight: bold;">{len(df_main)}</span></div>', unsafe_allow_html=True)
 
