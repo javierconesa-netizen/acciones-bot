@@ -12,7 +12,7 @@ except ImportError:
     import subprocess
     subprocess.check_call([
         sys.executable, "-m", "pip", "install", 
-        "yfinance", "lxml", "beautifulsoup4", "multitasking", 
+        "yfinance", "lxml", "beautifulsoup4", "multitasking", "websockets<17", 
         "--target", packages_dir
     ])
     import yfinance as yf
@@ -20,9 +20,6 @@ except ImportError:
 from datetime import datetime
 import pandas as pd
 import streamlit as st
-
-
-
 
 # Configuración de la página web
 st.set_page_config(
@@ -176,7 +173,7 @@ with tab1:
                 'Vol_Media_Fmt': 'Vol vs Media',
             }
         ),
-        use_container_width=True,
+        width='stretch',
     )
 
 with tab2:
@@ -216,7 +213,7 @@ with tab2:
                 'Vol_Media_Fmt': 'Vol vs Media',
             }
         ),
-        use_container_width=True,
+        width='stretch',
     )
 
 with tab3:
