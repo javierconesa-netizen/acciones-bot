@@ -29,20 +29,20 @@ st.set_page_config(
 st.markdown("""
     <style>
     .stApp {
-        background-color: #0d1117;
+        background-color: #090d16;
         color: #f0f2f6;
     }
     .metric-card {
-        background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
-        border: 1px solid #30363d;
-        padding: 18px;
-        border-radius: 14px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-        margin-bottom: 15px;
-        transition: transform 0.2s ease, border-color 0.2s ease;
+        background: linear-gradient(135deg, #131b2e 0%, #0d1117 100%);
+        border: 1px solid #21262d;
+        padding: 16px;
+        border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        margin-bottom: 14px;
+        transition: all 0.2s ease-in-out;
     }
     .metric-card:hover {
-        border-color: #58a6ff;
+        border-color: #3b82f6;
         transform: translateY(-2px);
     }
     h1, h2, h3 {
@@ -82,6 +82,21 @@ if 'custom_names' not in st.session_state:
         'RZLV': 'Rezolve AI',
         'LAES': 'Sealsq / LAES'
     }
+
+def generate_svg_sparkline(prices, is_positive):
+    if not prices or len(prices) < 2:
+        return ""
+    min_p, max_p = min(prices), max(prices)
+    rng = max_p - min_p if max_p != min_p else 1
+    width, height = 75, 28
+    points = []
+    for i, p in enumerate(prices):
+        x = (i / (len(prices) - 1)) * width
+        y = height - ((p - min_p) / rng) * (height - 6) - 3
+        points.append(f"{x:.1f},{y:.1f}")
+    pts_str = " ".join(points)
+    color = "#3fb950" if is_positive else "#f85149"
+    return f'<svg width="{width}" height="{height}" style="overflow:visible;"><polyline fill="none" stroke="{color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" points="{pts_str}" /></svg>'
 
 @st.cache_data(ttl=300)
 def get_comprehensive_market_data_extended(tickers_tuple):
@@ -137,6 +152,9 @@ def get_comprehensive_market_data_extended(tickers_tuple):
                 else:
                     perf_ytd = 0.0
 
+                recent_prices = hist['Close'].tail(15).tolist()
+                sparkline_svg = generate_svg_sparkline(recent_prices, price_change_pct >= 0)
+
                 data.append({
                     'Ticker': ticker,
                     'Nombre': search_term,
@@ -149,6 +167,7 @@ def get_comprehensive_market_data_extended(tickers_tuple):
                     'Perf_6M': perf_6m,
                     'Perf_1Y': perf_1y,
                     'Perf_YTD': perf_ytd,
+                    'Sparkline': sparkline_svg
                 })
         except Exception as e:
             print(f'Error procesando {ticker}: {e}')
@@ -229,42 +248,42 @@ if not df_main.empty:
         
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 13px; margin-bottom: 5px;">💰 Inversión Total</h4><h2 style="color: #f0f6fc; font-size: 22px;">${total_invested:,.2f}</h2></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">💰 Inversión Total</h4><h2 style="color: #f0f6fc; font-size: 20px;">${total_invested:,.2f}</h2></div>', unsafe_allow_html=True)
         with col2:
-            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 13px; margin-bottom: 5px;">📈 Valor Actual</h4><h2 style="color: #f0f6fc; font-size: 22px;">${total_current_value:,.2f}</h2></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">📈 Valor Actual</h4><h2 style="color: #f0f6fc; font-size: 20px;">${total_current_value:,.2f}</h2></div>', unsafe_allow_html=True)
         with col3:
-            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 13px; margin-bottom: 5px;">⚖️ Plusvalía Global</h4><h2 style="font-size: 22px;"><span style="color: {pl_color};">${total_pl:+,.2f} ({total_pl_pct:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">⚖️ Plusvalía Global</h4><h2 style="font-size: 20px;"><span style="color: {pl_color};">${total_pl:+,.2f} ({total_pl_pct:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
     else:
-        st.markdown(f'<div style="background: #161b22; border: 1px solid #30363d; padding: 12px 16px; border-radius: 10px; margin-bottom: 15px; font-size: 14px; color: #8b949e;">📊 <b>Activos Totales:</b> <span style="color: #f0f6fc; font-weight: bold;">{len(df_main)}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="background: #131b2e; border: 1px solid #21262d; padding: 12px 16px; border-radius: 12px; margin-bottom: 15px; font-size: 14px; color: #8b949e;">📊 <b>Activos Totales en Seguimiento:</b> <span style="color: #f0f6fc; font-weight: bold;">{len(df_main)}</span></div>', unsafe_allow_html=True)
 
     st.markdown('---')
 
+    # Controles de Periodo y Orden
     c_f1, c_f2 = st.columns(2)
     with c_f1:
         timeframe_label = st.selectbox(
-            "⏱️ Seleccionar Periodo", 
-            ['Actual', '1 Mes', '3 Meses', '6 Meses', '1 Año', 'Año en curso (YTD)'],
+            "⏱️ Periodo", 
+            ['Actual', '1 Mes', '3 Meses', '6 Meses', '1 Año', 'YTD'],
             key='main_tf_select'
         )
-    
+    with c_f2:
+        sort_option = st.selectbox(
+            "🔄 Ordenar", 
+            ['Diario [Alto a Bajo]', 'Diario [Bajo a Alto]', 
+             f'Histórico [Alto a Bajo]', f'Histórico [Bajo a Alto]',
+             'Ganancia (€) [Alto a Bajo]'],
+            key='main_sort_select'
+        )
+
     tf_mapping = {
         'Actual': 'Cambio (%)',
         '1 Mes': 'Perf_1M',
         '3 Meses': 'Perf_3M',
         '6 Meses': 'Perf_6M',
         '1 Año': 'Perf_1Y',
-        'Año en curso (YTD)': 'Perf_YTD'
+        'YTD': 'Perf_YTD'
     }
     active_perf_col = tf_mapping[timeframe_label]
-
-    with c_f2:
-        sort_option = st.selectbox(
-            "🔄 Ordenar Cartera por", 
-            ['Cambio Diario (%) [Mayor a Menor]', 'Cambio Diario (%) [Menor a Mayor]', 
-             f'Histórico ({timeframe_label}) [Mayor a Menor]', f'Histórico ({timeframe_label}) [Menor a Mayor]',
-             'Ganancias Reales (€) [Mayor a Menor]', 'Ganancias Reales (€) [Menor a Mayor]'],
-            key='main_sort_select'
-        )
 
     def calc_abs_pl(row):
         t = row['Ticker']
@@ -277,18 +296,16 @@ if not df_main.empty:
 
     df_main['Temp_P_L'] = df_main.apply(calc_abs_pl, axis=1)
 
-    if 'Diario (%) [Mayor a Menor]' in sort_option:
+    if 'Diario [Alto a Bajo]' in sort_option:
         df_main = df_main.sort_values(by='Cambio (%)', ascending=False)
-    elif 'Diario (%) [Menor a Mayor]' in sort_option:
+    elif 'Diario [Bajo a Alto]' in sort_option:
         df_main = df_main.sort_values(by='Cambio (%)', ascending=True)
-    elif '[Mayor a Menor]' in sort_option and 'Histórico' in sort_option:
+    elif '[Alto a Bajo]' in sort_option and 'Histórico' in sort_option:
         df_main = df_main.sort_values(by=active_perf_col, ascending=False)
-    elif '[Menor a Mayor]' in sort_option and 'Histórico' in sort_option:
+    elif '[Bajo a Alto]' in sort_option and 'Histórico' in sort_option:
         df_main = df_main.sort_values(by=active_perf_col, ascending=True)
-    elif 'Ganancias Reales (€) [Mayor a Menor]' in sort_option:
+    elif 'Ganancia (€) [Alto a Bajo]' in sort_option:
         df_main = df_main.sort_values(by='Temp_P_L', ascending=False)
-    elif 'Ganancias Reales (€) [Menor a Mayor]' in sort_option:
-        df_main = df_main.sort_values(by='Temp_P_L', ascending=True)
 
     st.markdown('---')
 
@@ -302,7 +319,7 @@ if not df_main.empty:
             hist_val = row[perf_col]
             color_hist = "#3fb950" if hist_val >= 0 else "#f85149"
             sign_hist = "+" if hist_val >= 0 else ""
-            hist_badge = f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 12px; color: #8b949e;"><span>{tf_label}:</span><span style="background: {color_hist}22; color: {color_hist}; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px;">{sign_hist}{hist_val:.2f}%</span></div>'
+            hist_badge = f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 11px; color: #8b949e;"><span>{tf_label}:</span><span style="color: {color_hist}; font-weight: bold;">{sign_hist}{hist_val:.2f}%</span></div>'
 
         t = row['Ticker']
         pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
@@ -317,9 +334,32 @@ if not df_main.empty:
             diff_pct = (diff / inv_val) * 100
             p_color = "#3fb950" if diff >= 0 else "#f85149"
             p_sign = "+" if diff >= 0 else ""
-            pos_html = f'<div style="background: rgba(22, 27, 34, 0.7); border-left: 3px solid {p_color}; margin-top: 10px; padding: 8px 10px; border-radius: 6px; font-size: 11px; display: flex; justify-content: space-between; align-items: center;"><span>💼 <b>{sh:g}</b> acc.</span><span style="color: {p_color}; font-weight: bold;">{p_sign}{row["Moneda"]}{diff:,.2f} ({p_sign}{diff_pct:.1f}%)</span></div>'
+            pos_html = f'<div style="background: rgba(19, 27, 46, 0.8); border-left: 3px solid {p_color}; margin-top: 8px; padding: 6px 8px; border-radius: 4px; font-size: 11px; display: flex; justify-content: space-between; align-items: center;"><span>💼 {sh:g} acc.</span><span style="color: {p_color}; font-weight: bold;">{p_sign}{row["Moneda"]}{diff:,.2f} ({p_sign}{diff_pct:.1f}%)</span></div>'
 
-        card_html = f'<div style="background: linear-gradient(145deg, #161b22 0%, #0d1117 100%); border: 1px solid #30363d; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.4);"><div style="display: flex; justify-content: space-between; align-items: flex-start;"><div><span style="font-size: 14px; font-weight: bold; color: #f0f6fc;">{row["Nombre"]}</span><span style="color: #8b949e; font-size: 11px; margin-left: 6px; background: #21262d; padding: 2px 6px; border-radius: 4px;">{row["Ticker"]}</span></div><div style="text-align: right;"><span style="font-size: 17px; font-weight: 800; color: #ffffff;">{row["Moneda"]}{row["Precio"]:.3f}</span></div></div><div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 12px; color: #8b949e;"><span>Hoy:</span><span style="background: {color_daily}22; color: {color_daily}; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px;">{sign_daily}{row["Cambio (%)"]:.2f}%</span></div>{hist_badge}{pos_html}</div>'
+        card_html = f'''
+        <div style="background: linear-gradient(145deg, #131b2e 0%, #090d16 100%); border: 1px solid #21262d; border-radius: 14px; padding: 14px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <span style="font-size: 14px; font-weight: bold; color: #f0f6fc;">{row["Nombre"]}</span><br>
+                    <span style="color: #8b949e; font-size: 10px; background: #1f2937; padding: 1px 5px; border-radius: 4px;">{row["Ticker"]}</span>
+                </div>
+                <div style="text-align: right;">
+                    <span style="font-size: 16px; font-weight: 800; color: #ffffff;">{row["Moneda"]}{row["Precio"]:.3f}</span>
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                <div>
+                    <span style="font-size: 11px; color: #8b949e;">Hoy:</span><br>
+                    <span style="color: {color_daily}; font-weight: bold; font-size: 12px;">{sign_daily}{row["Cambio (%)"]:.2f}%</span>
+                </div>
+                <div>
+                    {row["Sparkline"]}
+                </div>
+            </div>
+            {hist_badge}
+            {pos_html}
+        </div>'''
 
         st.markdown(card_html, unsafe_allow_html=True)
 
@@ -336,7 +376,7 @@ if not df_main.empty:
                 render_portfolio_card_grid(row, active_perf_col, timeframe_label)
 
     st.markdown('---')
-    csv_main = df_main.drop(columns=['Temp_P_L']).to_csv(index=False).encode('utf-8')
+    csv_main = df_main.drop(columns=['Temp_P_L', 'Sparkline']).to_csv(index=False).encode('utf-8')
     st.download_button(
         label="📥 Descargar Cartera Principal (CSV)",
         data=csv_main,
