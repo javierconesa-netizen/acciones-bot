@@ -27,28 +27,70 @@ st.set_page_config(
     page_title='Mi Cartera', page_icon='💎', layout='wide'
 )
 
-def check_password():
-    correct_password = st.secrets.get("PASSWORD", "1234")
-    
-    if st.session_state.get("password_correct", False):
-        return True
+GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
+GITHUB_REPO = "javierconesa-netizen/acciones-bot"
+FILE_PATH = "portfolio_data.json"
 
-    st.markdown("### 🔐 Acceso Restringido")
-    with st.form("login_form"):
-        entered_password = st.text_input("Introduce la contraseña:", type="password")
-        submit = st.form_submit_button("Entrar")
+def check_github_notification_auth():
+    if st.session_state.get("auth_approved", False):
+        return True
         
-        if submit:
-            if entered_password == correct_password:
-                st.session_state["password_correct"] = True
-                st.rerun()
+    st.markdown("### 🔐 Acceso Seguro mediante Notificación de GitHub")
+    st.markdown("Para entrar sin contraseñas, pulsa el botón para enviarte una alerta push a la app de GitHub en tu móvil.")
+    
+    if not GITHUB_TOKEN:
+        st.error("⚠️ Falta configurar `GITHUB_TOKEN` en los Secrets de Streamlit.")
+        return False
+
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        if st.button("📲 Enviar Notificación a mi GitHub", type="primary"):
+            url = f"https://api.github.com/repos/{GITHUB_REPO}/issues"
+            headers = {"Authorization": f"Bearer {GITHUB_TOKEN}", "Accept": "application/vnd.github+json"}
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            payload = {
+                "title": f"🔐 Solicitud de acceso a Cartera ({timestamp})",
+                "body": "Se ha intentado abrir la aplicación de cartera. Si eres tú, puedes cerrar este issue o pulsar el botón de acceso en la web."
+            }
+            resp = requests.post(url, headers=headers, json=payload)
+            if resp.status_code == 201:
+                issue_data = resp.json()
+                st.session_state["pending_issue_number"] = issue_data["number"]
+                st.success("✅ ¡Notificación enviada! Revisa tu móvil (notificación push de GitHub).")
             else:
-                st.session_state["password_correct"] = False
-                st.error("😕 Contraseña incorrecta")
+                st.error(f"Error al conectar con GitHub: {resp.status_code}")
+    
+    if "pending_issue_number" in st.session_state:
+        st.info(f"📲 Alerta activa en GitHub (Issue #{st.session_state['pending_issue_number']}).")
+        
+        col_v1, col_v2 = st.columns(2)
+        with col_v1:
+            if st.button("🔄 Verificar si ya lo aprobé/cerré"):
+                issue_num = st.session_state["pending_issue_number"]
+                url = f"https://api.github.com/repos/{GITHUB_REPO}/issues/{issue_num}"
+                headers = {"Authorization": f"Bearer {GITHUB_TOKEN}", "Accept": "application/vnd.github+json"}
+                resp = requests.get(url, headers=headers)
+                if resp.status_code == 200:
+                    issue_info = resp.json()
+                    if issue_info["state"] == "closed":
+                        st.session_state["auth_approved"] = True
+                        st.rerun()
+                    else:
+                        st.warning("El issue sigue abierto. Ciérralo en tu móvil o pulsa el botón de acceso directo.")
+        with col_v2:
+            if st.button("🚀 Acceso directo (Ya vi la notificación)"):
+                # Cerrar el issue automáticamente al entrar
+                issue_num = st.session_state["pending_issue_number"]
+                url = f"https://api.github.com/repos/{GITHUB_REPO}/issues/{issue_num}"
+                headers = {"Authorization": f"Bearer {GITHUB_TOKEN}", "Accept": "application/vnd.github+json"}
+                requests.patch(url, headers=headers, json={"state": "closed"})
+                
+                st.session_state["auth_approved"] = True
+                st.rerun()
                 
     return False
 
-if not check_password():
+if not check_github_notification_auth():
     st.stop()
 
 st.markdown("""
@@ -77,8 +119,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
-GITHUB_REPO = "javierconesa-netizen/acciones-bot"
 FILE_PATH = "portfolio_data.json"
 
 def load_from_github():
