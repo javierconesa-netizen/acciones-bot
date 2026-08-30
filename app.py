@@ -22,35 +22,80 @@ except ImportError:
     ])
     import yfinance as yf
 
-# Configuración de la página web
+# Configuración de la página web (Modo ancho para aprovechar el diseño)
 st.set_page_config(
-    page_title='Panel de Inversión y Seguimiento', page_icon='📈', layout='wide'
+    page_title='Panel Financiero Profesional', page_icon='💎', layout='wide'
 )
 
+# Inyección de Estilos CSS Avanzados para un aspecto Profesional y Moderno
+st.markdown("""
+    <style>
+    /* Estilo general y tipografía */
+    .stApp {
+        background-color: #0e1117;
+        color: #f0f2f6;
+    }
+    
+    /* Tarjetas de métricas personalizadas */
+    .metric-card {
+        background: linear-gradient(135deg, #1e222d 0%, #161b22 100%);
+        border: 1px solid #30363d;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        margin-bottom: 15px;
+        transition: transform 0.2s ease;
+    }
+    .metric-card:hover {
+        border-color: #58a6ff;
+        transform: translateY(-2px);
+    }
+    
+    /* Encabezados de secciones */
+    h1, h2, h3 {
+        color: #f0f6fc;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    
+    /* Estilo para las pestañas */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #161b22;
+        border-radius: 8px 8px 0px 0px;
+        color: #8b949e;
+        padding: 10px 20px;
+        font-weight: 600;
+        border: 1px solid #30363d;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #238636 !important;
+        color: white !important;
+        border-color: #2ea043 !important;
+    }
+
+    /* Tarjetas de noticias */
+    .news-card {
+        background-color: #161b22;
+        border-left: 4px solid #238636;
+        padding: 15px;
+        border-radius: 0 8px 8px 0;
+        margin-bottom: 12px;
+        border-top: 1px solid #30363d;
+        border-right: 1px solid #30363d;
+        border-bottom: 1px solid #30363d;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 TICKERS = [
-    'KO',
-    'NFLX',
-    'MC.PA',
-    'NOV.DE',
-    'ACHR',
-    'TSM',
-    'OPEN',
-    'NVDA',
-    'IREN',
-    'ASTS',
-    'ONDS',
-    'RKLB',
-    'GOOGL',
-    'SLNH',
-    'RZLV',
-    'LAES',
-    'BTC-USD',
+    'KO', 'NFLX', 'MC.PA', 'NOV.DE', 'ACHR', 'TSM', 'OPEN', 
+    'NVDA', 'IREN', 'ASTS', 'ONDS', 'RKLB', 'GOOGL', 'SLNH', 
+    'RZLV', 'LAES', 'BTC-USD'
 ]
 
-TRACKING_TICKERS = [
-    'GOSS',
-    'BSIN',
-]
+TRACKING_TICKERS = ['GOSS', 'BSIN']
 
 NAMES = {
     'KO': 'Coca-Cola',
@@ -58,6 +103,43 @@ NAMES = {
     'BTC-USD': 'Bitcoin',
     'NOV.DE': 'Novo Nordisk',
     'OPEN': 'Opendoor Technologies',
+    'NFLX': 'Netflix',
+    'NVDA': 'NVIDIA',
+    'TSM': 'TSMC',
+    'GOOGL': 'Alphabet (Google)',
+    'ACHR': 'Archer Aviation',
+    'IREN': 'Iris Energy',
+    'ASTS': 'AST SpaceMobile',
+    'ONDS': 'Ondas Holdings',
+    'RKLB': 'Rocket Lab',
+    'SLNH': 'Silver牛 Mining',
+    'RZLV': 'Rezolve AI',
+    'LAES': 'Secoo / LAES',
+    'GOSS': 'Gossamer Bio',
+    'BSIN': 'Black Spade Acquisition'
+}
+
+# Dominios web oficiales para extraer los logos/fotos de las empresas automáticamente
+DOMAINS = {
+    'KO': 'coca-cola.com',
+    'NFLX': 'netflix.com',
+    'MC.PA': 'lvmh.com',
+    'NOV.DE': 'novonordisk.com',
+    'ACHR': 'archer.com',
+    'TSM': 'tsmc.com',
+    'OPEN': 'opendoor.com',
+    'NVDA': 'nvidia.com',
+    'IREN': 'iren.com',
+    'ASTS': 'asts.com',
+    'ONDS': 'ondas.com',
+    'RKLB': 'rocketlabusa.com',
+    'GOOGL': 'google.com',
+    'SLNH': 'silvernew.com',
+    'RZLV': 'rezolve.com',
+    'LAES': 'laes.com',
+    'BTC-USD': 'bitcoin.org',
+    'GOSS': 'gossamerbio.com',
+    'BSIN': 'blackspadeacquisition.com'
 }
 
 FALLBACK_DIVIDENDS = {
@@ -74,6 +156,9 @@ def get_comprehensive_market_data(tickers_list):
   data = []
   for ticker in tickers_list:
     search_term = NAMES.get(ticker, ticker)
+    domain = DOMAINS.get(ticker, "")
+    logo_url = f"https://logo.clearbit.com/{domain}" if domain else ""
+    
     try:
       stock = yf.Ticker(ticker)
       hist = stock.history(period='3mo')
@@ -101,9 +186,11 @@ def get_comprehensive_market_data(tickers_list):
 
         rsi_label = 'Normal'
         if current_rsi > 70:
-          rsi_label = 'Sobrecompra (>70)'
+          rsi_label = '🔴 Sobrecompra (>70)'
         elif current_rsi < 30:
-          rsi_label = 'Sobreventa (<30)'
+          rsi_label = '🟢 Sobreventa (<30)'
+        else:
+          rsi_label = '⚪ Neutral'
 
         div_rate = 0.0
         yield_pct = 0.0
@@ -144,6 +231,7 @@ def get_comprehensive_market_data(tickers_list):
         data.append({
             'Ticker': ticker,
             'Nombre': search_term,
+            'Logo': logo_url,
             'Precio': close_today,
             'Moneda': currency,
             'Cambio (%)': price_change,
@@ -200,11 +288,11 @@ def fetch_google_news(tickers_list):
             print(f'Error buscando noticias de {ticker}: {e}')
     return news_items
 
-# Interfaz visual de la Web
-st.title('📊 Panel de Control y Seguimiento Financiero')
-st.markdown(f'*Actualizado a fecha:* {datetime.now().strftime("%d/%m/%Y %H:%M")}')
+# Cabecera Visual con diseño profesional
+st.title('💎 Terminal de Inversión y Seguimiento Financiero')
+st.markdown(f'<p style="color: #8b949e; font-size: 15px;">🚀 Sincronización en tiempo real — Actualizado a fecha: {datetime.now().strftime("%d/%m/%Y %H:%M")}</p>', unsafe_allow_html=True)
 
-with st.spinner('Cargando cotizaciones y noticias de mercado...'):
+with st.spinner('Actualizando mercados y descargando perfiles corporativos...'):
   df_main = get_comprehensive_market_data(TICKERS)
   df_track = get_comprehensive_market_data(TRACKING_TICKERS)
   all_news = fetch_google_news(TICKERS + TRACKING_TICKERS)
@@ -215,98 +303,134 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     '📈 Análisis Técnico & RSI',
     '💰 Dividendos & Earnings',
     '📰 Noticias RSS',
-    '📉 Gráficos',
+    '📉 Gráficos Avanzados',
 ])
 
 with tab1:
-  st.subheader('Cartera Principal (Precios y Volúmenes)')
+  st.subheader('🚀 Cartera Principal (Rendimiento y Volumen)')
   if not df_main.empty:
     df_main_sorted = df_main.sort_values(by='Cambio (%)', ascending=False)
-    df_display = df_main_sorted.copy()
-    df_display['Precio_Fmt'] = df_display.apply(lambda x: f"{x['Moneda']}{x['Precio']:.2f}", axis=1)
-    df_display['Cambio_Fmt'] = df_display['Cambio (%)'].map(lambda x: f'{x:+.2f}%')
-    df_display['Volumen_Fmt'] = df_display['Volumen Hoy'].map(lambda x: f'{x:,.0f}')
-    df_display['Vol_Media_Fmt'] = df_display['Volumen vs Media (%)'].map(lambda x: f'{x:.0f}%')
-
+    
     col1, col2, col3 = st.columns(3)
     best_asset = df_main_sorted.iloc[0]
     worst_asset = df_main_sorted.iloc[-1]
-    col1.metric('Activos Monitoreados', len(df_main))
-    col2.metric('Mayor Subida', best_asset['Nombre'], f"{best_asset['Cambio (%)']:+.2f}%")
-    col3.metric('Mayor Bajada', worst_asset['Nombre'], f"{worst_asset['Cambio (%)']:+.2f}%")
+    
+    with col1:
+        st.markdown(f'<div class="metric-card"><h4>📊 Activos Totales</h4><h2>{len(df_main)}</h2></div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown(f'<div class="metric-card"><h4>🚀 Mayor Subida</h4><h2>{best_asset["Nombre"]} <span style="color: #238636; font-size: 18px;">({best_asset["Cambio (%)"]+.2f}%)</span></h2></div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown(f'<div class="metric-card"><h4>🔻 Mayor Bajada</h4><h2>{worst_asset["Nombre"]} <span style="color: #da3633; font-size: 18px;">({worst_asset["Cambio (%)"]+.2f}%)</span></h2></div>', unsafe_allow_html=True)
 
     st.markdown('---')
-    st.dataframe(
-        df_display[['Ticker', 'Nombre', 'Precio_Fmt', 'Cambio_Fmt', 'Volumen_Fmt', 'Vol_Media_Fmt']].rename(
-            columns={'Precio_Fmt': 'Precio', 'Cambio_Fmt': 'Cambio', 'Volumen_Fmt': 'Volumen', 'Vol_Media_Fmt': 'Vol vs Media'}
-        ),
-        width='stretch',
-    )
+    
+    # Vista profesional en tarjetas/tabla con imágenes de logos
+    for index, row in df_main_sorted.iterrows():
+        color_change = "#238636" if row['Cambio (%)'] >= 0 else "#da3633"
+        sign = "+" if row['Cambio (%)'] >= 0 else ""
+        
+        c1, c2, c3, c4, c5 = st.columns([0.6, 2.2, 1.2, 1.2, 1.5])
+        with c1:
+            st.image(row['Logo'], width=35, output_format='png')
+        with c2:
+            st.markdown(f"**{row['Nombre']}**  \n<span style='color: #8b949e; font-size: 12px;'>{row['Ticker']}</span>", unsafe_allow_html=True)
+        with c3:
+            st.markdown(f"**{row['Moneda']}{row['Precio']:.2f}**")
+        with c4:
+            st.markdown(f"<span style='color: {color_change}; font-weight: bold;'>{sign}{row['Cambio (%)']:.2f}%</span>", unsafe_allow_html=True)
+        with c5:
+            st.markdown(f"<span style='color: #8b949e; font-size: 13px;'>Vol vs Media: <b>{row['Volumen vs Media (%)']:.0f}%</b></span>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin: 5px 0px; border-color: #21262d;'>", unsafe_allow_html=True)
 
 with tab2:
-  st.subheader('Cartera de Seguimiento (Secundarios)')
+  st.subheader('🔍 Cartera de Seguimiento (Radar)')
   if not df_track.empty:
     df_track_sorted = df_track.sort_values(by='Cambio (%)', ascending=False)
-    df_track_display = df_track_sorted.copy()
-    df_track_display['Precio_Fmt'] = df_track_display.apply(lambda x: f"{x['Moneda']}{x['Precio']:.2f}", axis=1)
-    df_track_display['Cambio_Fmt'] = df_track_display['Cambio (%)'].map(lambda x: f'{x:+.2f}%')
-    df_track_display['Volumen_Fmt'] = df_track_display['Volumen Hoy'].map(lambda x: f'{x:,.0f}')
-    df_track_display['Vol_Media_Fmt'] = df_track_display['Volumen vs Media (%)'].map(lambda x: f'{x:.0f}%')
-
-    st.dataframe(
-        df_track_display[['Ticker', 'Nombre', 'Precio_Fmt', 'Cambio_Fmt', 'Volumen_Fmt', 'Vol_Media_Fmt']].rename(
-            columns={'Precio_Fmt': 'Precio', 'Cambio_Fmt': 'Cambio', 'Volumen_Fmt': 'Volumen', 'Vol_Media_Fmt': 'Vol vs Media'}
-        ),
-        width='stretch',
-    )
+    for index, row in df_track_sorted.iterrows():
+        color_change = "#238636" if row['Cambio (%)'] >= 0 else "#da3633"
+        sign = "+" if row['Cambio (%)'] >= 0 else ""
+        
+        c1, c2, c3, c4, c5 = st.columns([0.6, 2.2, 1.2, 1.2, 1.5])
+        with c1:
+            st.image(row['Logo'], width=35, output_format='png')
+        with c2:
+            st.markdown(f"**{row['Nombre']}**  \n<span style='color: #8b949e; font-size: 12px;'>{row['Ticker']}</span>", unsafe_allow_html=True)
+        with c3:
+            st.markdown(f"**{row['Moneda']}{row['Precio']:.2f}**")
+        with c4:
+            st.markdown(f"<span style='color: {color_change}; font-weight: bold;'>{sign}{row['Cambio (%)']:.2f}%</span>", unsafe_allow_html=True)
+        with c5:
+            st.markdown(f"<span style='color: #8b949e; font-size: 13px;'>Vol vs Media: <b>{row['Volumen vs Media (%)']:.0f}%</b></span>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin: 5px 0px; border-color: #21262d;'>", unsafe_allow_html=True)
 
 with tab3:
-  st.subheader('📈 Análisis Técnico (RSI)')
+  st.subheader('📈 Análisis Técnico (Indicador RSI 14 Periodos)')
   if not df_main.empty:
-    df_rsi = df_main[['Ticker', 'Nombre', 'RSI', 'RSI_Label']].sort_values(by='RSI', ascending=False).copy()
-    df_rsi['RSI'] = df_rsi['RSI'].map(lambda x: f'{x:.1f}')
-    st.dataframe(df_rsi.rename(columns={'RSI_Label': 'Estado'}), width='stretch')
+    df_rsi = df_main[['Ticker', 'Nombre', 'Logo', 'RSI', 'RSI_Label']].sort_values(by='RSI', ascending=False)
+    for index, row in df_rsi.iterrows():
+        c1, c2, c3, c4 = st.columns([0.6, 2.5, 1.5, 2.4])
+        with c1:
+            st.image(row['Logo'], width=35)
+        with c2:
+            st.markdown(f"**{row['Nombre']}** ({row['Ticker']})")
+        with c3:
+            st.markdown(f"RSI: **{row['RSI']:.1f}**")
+        with c4:
+            st.markdown(f"**{row['RSI_Label']}**")
+        st.markdown("<hr style='margin: 5px 0px; border-color: #21262d;'>", unsafe_allow_html=True)
 
 with tab4:
   st.subheader('💰 Dividendos y Próximos Resultados (Earnings)')
   if not df_main.empty:
-    df_div_earn = df_main[['Ticker', 'Nombre', 'Ex_Date', 'Yield_Pct', 'Div_Rate', 'Moneda', 'Earnings']].copy()
-    df_div_earn['Yield_Fmt'] = df_div_earn['Yield_Pct'].map(lambda x: f'{x:.2f}%')
-    df_div_earn['Div_Fmt'] = df_div_earn.apply(lambda x: f"{x['Moneda']}{x['Div_Rate']:.2f}", axis=1)
-    
-    st.markdown('### Calendario de Dividendos')
-    st.dataframe(
-        df_div_earn[['Ticker', 'Nombre', 'Ex_Date', 'Yield_Fmt', 'Div_Fmt']].rename(
-            columns={'Ex_Date': 'Fecha Ex-Dividendo', 'Yield_Fmt': 'Rentabilidad Anual', 'Div_Fmt': 'Dividendo Anual'}
-        ),
-        width='stretch',
-    )
+    st.markdown('### 📅 Calendario de Dividendos')
+    for index, row in df_main.iterrows():
+        if row['Yield_Pct'] > 0:
+            c1, c2, c3, c4 = st.columns([0.6, 2.5, 1.8, 2.1])
+            with c1:
+                st.image(row['Logo'], width=35)
+            with c2:
+                st.markdown(f"**{row['Nombre']}**")
+            with c3:
+                st.markdown(f"Ex-Fecha: <b>{row['Ex_Date']}</b>", unsafe_allow_html=True)
+            with c4:
+                st.markdown(f"Rentabilidad: <span style='color: #238636; font-weight: bold;'>{row['Yield_Pct']:.2f}%</span> ({row['Moneda']}{row['Div_Rate']:.2f})", unsafe_allow_html=True)
+            st.markdown("<hr style='margin: 5px 0px; border-color: #21262d;'>", unsafe_allow_html=True)
 
-    st.markdown('### Próximos Earnings (Resultados)')
-    st.dataframe(
-        df_div_earn[['Ticker', 'Nombre', 'Earnings']].rename(columns={'Earnings': 'Fecha Estimada'}),
-        width='stretch',
-    )
+    st.markdown('<br>### 📊 Próximos Resultados (Earnings)', unsafe_allow_html=True)
+    for index, row in df_main.iterrows():
+        c1, c2, c3 = st.columns([0.6, 3.0, 3.0])
+        with c1:
+            st.image(row['Logo'], width=35)
+        with c2:
+            st.markdown(f"**{row['Nombre']}** ({row['Ticker']})")
+        with c3:
+            st.markdown(f"📅 Fecha estimada: **{row['Earnings']}**")
+        st.markdown("<hr style='margin: 5px 0px; border-color: #21262d;'>", unsafe_allow_html=True)
 
 with tab5:
-  st.subheader('📰 Últimas Noticias de Google News (Filtro Personalizado)')
+  st.subheader('📰 Noticias Financieras en Vivo')
   if all_news:
     for news in all_news:
-      st.markdown(f"**[{news['Activo']}]** [{news['Titulo']}]({news['Enlace']})")
-      st.caption(f"Publicado: {news['Fecha']}")
-      st.markdown('---')
+      st.markdown(f"""
+        <div class="news-card">
+            <span style="background-color: #238636; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">{news['Activo']}</span>
+            <br><br>
+            <a href="{news['Enlace']}" target="_blank" style="color: #58a6ff; text-decoration: none; font-size: 16px; font-weight: bold;">{news['Titulo']}</a>
+            <p style="color: #8b949e; font-size: 11px; margin-top: 5px;">Publicado: {news['Fecha']}</p>
+        </div>
+      """, unsafe_allow_html=True)
   else:
     st.info('No se encontraron noticias recientes o el servicio RSS no devolvió elementos.')
 
 with tab6:
-  st.subheader('Evolución Gráfica de Activos (Últimos 3 Meses)')
+  st.subheader('📉 Evolución Gráfica Avanzada (Últimos 3 Meses)')
   all_available_tickers = TICKERS + TRACKING_TICKERS
-  selected_ticker = st.selectbox('Selecciona el activo que deseas graficar:', all_available_tickers)
+  selected_ticker = st.selectbox('Selecciona el activo para ver el gráfico de precios:', all_available_tickers)
 
   if selected_ticker:
     try:
       stock_obj = yf.Ticker(selected_ticker)
       hist_data = stock_obj.history(period='3mo')['Close']
-      st.line_chart(hist_data)
+      st.line_chart(hist_data, color="#238636")
     except Exception as e:
       st.error(f'No se pudo cargar el gráfico para {selected_ticker}: {e}')
