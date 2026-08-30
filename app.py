@@ -114,7 +114,7 @@ NAMES = {
     'RKLB': 'Rocket Lab',
     'SLNH': 'Silver牛 Mining',
     'RZLV': 'Rezolve AI',
-    'LAES': 'Secoo / LAES',
+    'LAES': 'Sealsq / LAES',
     'GOSS': 'Gossamer Bio',
     'BSIN': 'Black Spade Acquisition'
 }
@@ -145,7 +145,8 @@ def get_comprehensive_market_data(tickers_list):
         vol_today = today_data['Volume']
         avg_volume = hist['Volume'][:-1].mean() if len(hist) > 1 else vol_today
 
-        price_change = ((close_today - close_prev) / close_prev) * 100
+        price_change_abs = close_today - close_prev
+        price_change_pct = (price_change_abs / close_prev) * 100
         currency = '€' if ticker in ['MC.PA', 'NOV.DE'] else '$'
         vol_ratio = (vol_today / avg_volume) * 100 if avg_volume > 0 else 0.0
 
@@ -207,7 +208,8 @@ def get_comprehensive_market_data(tickers_list):
             'Nombre': search_term,
             'Precio': close_today,
             'Moneda': currency,
-            'Cambio (%)': price_change,
+            'Cambio (%)': price_change_pct,
+            'Cambio Abs': price_change_abs,
             'Volumen Hoy': vol_today,
             'Volumen vs Media (%)': vol_ratio,
             'RSI': current_rsi,
@@ -279,7 +281,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 ])
 
 with tab1:
-  st.subheader('🚀 Cartera Principal (Rendimiento y Volumen)')
+  st.subheader('🚀 Cartera Principal')
   if not df_main.empty:
     df_main_sorted = df_main.sort_values(by='Cambio (%)', ascending=False)
     
@@ -300,18 +302,22 @@ with tab1:
         color_change = "#238636" if row['Cambio (%)'] >= 0 else "#da3633"
         sign = "+" if row['Cambio (%)'] >= 0 else ""
         
-        c1, c2, c3, c4, c5 = st.columns([0.6, 2.2, 1.2, 1.2, 1.5])
+        c1, c2 = st.columns([1.5, 1.5])
         with c1:
-            st.markdown(f'<div class="ticker-badge">{row["Ticker"]}</div>', unsafe_allow_html=True)
+            st.markdown(f"""
+                <div style="line-height: 1.3;">
+                    <span style="font-size: 15px; font-weight: bold; color: #f0f6fc;">{row['Nombre']}</span><br>
+                    <span style="color: #8b949e; font-size: 12px;">🕒 {datetime.now().strftime("%d/%m")} | {row['Ticker']}</span>
+                </div>
+            """, unsafe_allow_html=True)
         with c2:
-            st.markdown(f"**{row['Nombre']}**", unsafe_allow_html=True)
-        with c3:
-            st.markdown(f"**{row['Moneda']}{row['Precio']:.2f}**")
-        with c4:
-            st.markdown(f"<span style='color: {color_change}; font-weight: bold;'>{sign}{row['Cambio (%)']:.2f}%</span>", unsafe_allow_html=True)
-        with c5:
-            st.markdown(f"<span style='color: #8b949e; font-size: 13px;'>Vol: <b>{row['Volumen vs Media (%)']:.0f}%</b></span>", unsafe_allow_html=True)
-        st.markdown("<hr style='margin: 5px 0px; border-color: #21262d;'>", unsafe_allow_html=True)
+            st.markdown(f"""
+                <div style="text-align: right; line-height: 1.3;">
+                    <span style="font-size: 16px; font-weight: bold; color: #f0f6fc;">{row['Moneda']}{row['Precio']:.3f}</span><br>
+                    <span style="color: {color_change}; font-size: 13px; font-weight: bold;">{sign}{row['Cambio Abs']:.3f} ({sign}{row['Cambio (%)']:.2f}%)</span>
+                </div>
+            """, unsafe_allow_html=True)
+        st.markdown("<hr style='margin: 8px 0px; border-color: #21262d;'>", unsafe_allow_html=True)
 
 with tab2:
   st.subheader('🔍 Cartera de Seguimiento (Radar)')
@@ -321,18 +327,22 @@ with tab2:
         color_change = "#238636" if row['Cambio (%)'] >= 0 else "#da3633"
         sign = "+" if row['Cambio (%)'] >= 0 else ""
         
-        c1, c2, c3, c4, c5 = st.columns([0.6, 2.2, 1.2, 1.2, 1.5])
+        c1, c2 = st.columns([1.5, 1.5])
         with c1:
-            st.markdown(f'<div class="ticker-badge">{row["Ticker"]}</div>', unsafe_allow_html=True)
+            st.markdown(f"""
+                <div style="line-height: 1.3;">
+                    <span style="font-size: 15px; font-weight: bold; color: #f0f6fc;">{row['Nombre']}</span><br>
+                    <span style="color: #8b949e; font-size: 12px;">🕒 {datetime.now().strftime("%d/%m")} | {row['Ticker']}</span>
+                </div>
+            """, unsafe_allow_html=True)
         with c2:
-            st.markdown(f"**{row['Nombre']}**", unsafe_allow_html=True)
-        with c3:
-            st.markdown(f"**{row['Moneda']}{row['Precio']:.2f}**")
-        with c4:
-            st.markdown(f"<span style='color: {color_change}; font-weight: bold;'>{sign}{row['Cambio (%)']:.2f}%</span>", unsafe_allow_html=True)
-        with c5:
-            st.markdown(f"<span style='color: #8b949e; font-size: 13px;'>Vol: <b>{row['Volumen vs Media (%)']:.0f}%</b></span>", unsafe_allow_html=True)
-        st.markdown("<hr style='margin: 5px 0px; border-color: #21262d;'>", unsafe_allow_html=True)
+            st.markdown(f"""
+                <div style="text-align: right; line-height: 1.3;">
+                    <span style="font-size: 16px; font-weight: bold; color: #f0f6fc;">{row['Moneda']}{row['Precio']:.3f}</span><br>
+                    <span style="color: {color_change}; font-size: 13px; font-weight: bold;">{sign}{row['Cambio Abs']:.3f} ({sign}{row['Cambio (%)']:.2f}%)</span>
+                </div>
+            """, unsafe_allow_html=True)
+        st.markdown("<hr style='margin: 8px 0px; border-color: #21262d;'>", unsafe_allow_html=True)
 
 with tab3:
   st.subheader('📈 Análisis Técnico (Indicador RSI 14 Periodos)')
