@@ -3,7 +3,7 @@ import os
 import base64
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 import streamlit as st
 
@@ -23,30 +23,51 @@ except ImportError:
     ])
     import yfinance as yf
 
+try:
+    import extra_streamlit_components as stx
+except ImportError:
+    import subprocess
+    subprocess.check_call([
+        sys.executable, "-m", "pip", "install", 
+        "extra-streamlit-components", "--target", packages_dir
+    ])
+    import extra_streamlit_components as stx
+
 st.set_page_config(
     page_title='Mi Cartera', page_icon='💎', layout='wide'
 )
 
+cookie_manager = stx.CookieManager()
+
 def check_password():
+    correct_password = st.secrets.get("PASSWORD", "1234")
+    cookie_token = base64.b64encode(correct_password.encode()).decode()
+    
+    # Comprobar si ya está en session_state
+    if st.session_state.get("password_correct", False):
+        return True
+
+    # Comprobar si existe la cookie válida
+    saved_cookie = cookie_manager.get(cookie="auth_token")
+    if saved_cookie == cookie_token:
+        st.session_state["password_correct"] = True
+        return True
+
     def password_entered():
-        correct_password = st.secrets.get("PASSWORD", "1234")
         if st.session_state["password"] == correct_password:
             st.session_state["password_correct"] = True
+            cookie_manager.set("auth_token", cookie_token, expires_at=datetime.now() + timedelta(days=30))
             del st.session_state["password"]
         else:
             st.session_state["password_correct"] = False
 
-    if "password_correct" not in st.session_state:
+    if "password_correct" not in st.session_state or not st.session_state["password_correct"]:
         st.markdown("### 🔐 Acceso Restringido")
         st.text_input("Introduce la contraseña:", type="password", on_change=password_entered, key="password")
+        if "password_correct" in st.session_state and not st.session_state["password_correct"]:
+            st.error("😕 Contraseña incorrecta")
         return False
-    elif not st.session_state["password_correct"]:
-        st.markdown("### 🔐 Acceso Restringido")
-        st.text_input("Introduce la contraseña:", type="password", on_change=password_entered, key="password")
-        st.error("😕 Contraseña incorrecta")
-        return False
-    else:
-        return True
+    return True
 
 if not check_password():
     st.stop()
@@ -159,7 +180,6 @@ if 'custom_names' not in st.session_state:
             'LAES': 'Sealsq / LAES', 'MU': 'Micron'
         }
 
-# Asegurar nombre correcto para Micron
 if st.session_state.custom_names.get('MU') in [None, '', 'MU']:
     st.session_state.custom_names['MU'] = 'Micron'
 
@@ -256,7 +276,6 @@ def get_comprehensive_market_data_extended(tickers_tuple):
             print(f'Error procesando {ticker}: {e}')
     return pd.DataFrame(data)
 
-# Botón de Ajustes (Engranaje) alineado a la derecha
 col_empty, col_gear = st.columns([5, 1])
 with col_gear:
     with st.popover("⚙️", help="Panel de Control"):
@@ -467,7 +486,7 @@ if not df_main.empty:
             f'<div style="display: flex; justify-content: space-between; align-items: flex-start;">'
             f'<div><span style="font-size: 14px; font-weight: bold; color: #f0f6fc;">{row["Nombre"]}</span><br>'
             f'<span style="color: #8b949e; font-size: 10px; background: #1f2937; padding: 1px 5px; border-radius: 4px;">{row["Ticker"]}</span></div>'
-            f'<div style="text-align: right;"><span style="font-size: 16px; font-weight: 800; color: #ffffff;">{row["Moneda"]}{row["Precio"]:.3f}</span></div>'
+            f'<div style="text-align: right;"><span style="font-size: 16px; font-weight: 800; color: #ffffff;">{row["Moneda"]}{row["Precio']:.3f}</span></div>'
             f'</div>'
             f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">'
             f'<div><span style="font-size: 11px; color: #8b949e;">Hoy:</span><br>'
