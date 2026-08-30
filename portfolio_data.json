@@ -16,8 +16,7 @@
         "SLNH",
         "RZLV",
         "LAES",
-        "BTC-USD",
-        "MU"
+        "BTC-USD"
     ],
     "custom_names": {
         "KO": "Coca-Cola",
@@ -36,8 +35,7 @@
         "RKLB": "Rocket Lab",
         "SLNH": "Soluna Holdings",
         "RZLV": "Rezolve AI",
-        "LAES": "Sealsq / LAES",
-        "MU": "Micron Technology, Inc."
+        "LAES": "Sealsq / LAES"
     },
     "portfolio_positions": {
         "KO": {
@@ -107,10 +105,6 @@
         "BTC-USD": {
             "shares": 0.021,
             "buy_price": 70304.5
-        },
-        "MU": {
-            "shares": 0.0,
-            "buy_price": 0.0
         }
     }
 }
