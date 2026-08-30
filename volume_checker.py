@@ -16,6 +16,7 @@ DIVIDENDS_THREAD_ID = 257  # Tema: Dividendos y ex-dividendos
 EARNINGS_THREAD_ID = 419  # Tema: Resultados (earnings)
 FEAR_GREED_THREAD_ID = 420  # Tema: Índice de Miedo
 TECHNICAL_THREAD_ID = 421  # Tema: Sobrecompra sobreventa y medias
+TRACKING_THREAD_ID = 1098  # Tema: Cartera seguimiento
 
 TICKERS = [
     'KO',
@@ -27,9 +28,7 @@ TICKERS = [
     'OPEN',
     'NVDA',
     'IREN',
-    'GOSS',
     'ASTS',
-    'BSIN',
     'ONDS',
     'RKLB',
     'GOOGL',
@@ -39,7 +38,14 @@ TICKERS = [
     'BTC-USD',
 ]
 
+# Lista secundaria: solo control de precios/volumen (sin noticias)
+TRACKING_TICKERS = [
+    'GOSS',
+    'BSIN',
+]
+
 NAMES = {
+    'KO': 'Coca-Cola',
     'MC.PA': 'LVMH',
     'BTC-USD': 'Bitcoin',
     'NOV.DE': 'Novo Nordisk',
@@ -113,6 +119,14 @@ def check_all_news():
       'enfrentamiento',
       'deporte',
       'fútbol',
+      'boxeo',
+      'muay thai',
+      'combate',
+      'ufc',
+      'mma',
+      'ejercicios',
+      'entrenamiento',
+      'método ko',
   ]
 
   for ticker in TICKERS:
@@ -172,6 +186,7 @@ def check_market():
   updated_volumes = {}
 
   summary_data = []
+  tracking_summary_data = []
   dividend_data = []
   earnings_data = []
   technical_data = []
@@ -193,7 +208,11 @@ def check_market():
       f'📅 *Fecha:* {now_spain.strftime("%d/%m/%Y")}\n',
   ]
 
-  for ticker in TICKERS:
+  all_assets = [(t, False) for t in TICKERS] + [
+      (t, True) for t in TRACKING_TICKERS
+  ]
+
+  for ticker, is_tracking in all_assets:
     search_term = NAMES.get(ticker, ticker)
     current_session = get_market_session_start(now_spain, ticker)
 
@@ -215,12 +234,17 @@ def check_market():
       price_change = ((close_today - close_prev) / close_prev) * 100
       currency = '€' if ticker in ['MC.PA', 'NOV.DE'] else '$'
 
-      summary_data.append({
+      item_summary = {
           'name': search_term,
           'price': close_today,
           'change': price_change,
           'currency': currency,
-      })
+      }
+
+      if is_tracking:
+        tracking_summary_data.append(item_summary)
+      else:
+        summary_data.append(item_summary)
 
       # Validar sesión para precios
       saved_price_data = last_alert_prices.get(ticker, {})
@@ -228,87 +252,107 @@ def check_market():
       if saved_price_data.get('session') == current_session:
         last_price_alerted = saved_price_data.get('value')
 
-      # Validar sesión para volúmenes
+      # Validar sesión para volúmenes (Tiers: 50%, 100%, 150%, 200%)
       saved_vol_data = last_alert_volumes.get(ticker, {})
-      last_vol_alerted = None
+      last_vol_tier = None
       if saved_vol_data.get('session') == current_session:
-        last_vol_alerted = saved_vol_data.get('value')
+        last_vol_tier = saved_vol_data.get('value', 0.0)
 
-      # Dividendos
+      current_vol_tier = 0.0
+      vol_label = ''
+      if avg_volume > 0:
+        vol_ratio = vol_today / avg_volume
+        if vol_ratio >= 2.0:
+          current_vol_tier = 2.0
+          vol_label = '🚨 *¡Volumen al 200%+ de la media!*'
+        elif vol_ratio >= 1.5:
+          current_vol_tier = 1.5
+          vol_label = '⚠️ *¡Volumen al 150%+ de la media!*'
+        elif vol_ratio >= 1.0:
+          current_vol_tier = 1.0
+          vol_label = '⚠️ *¡Volumen al 100% de la media!*'
+        elif vol_ratio >= 0.5:
+          current_vol_tier = 0.5
+          vol_label = 'ℹ️ *¡Volumen al 50% de la media!*'
+
+      # Dividendos (solo principales)
       div_rate = None
       ex_date_str = 'Próximamente'
       yield_pct = 0.0
 
-      if ticker in FALLBACK_DIVIDENDS:
-        fb = FALLBACK_DIVIDENDS[ticker]
-        div_rate = fb['div_rate']
-        yield_pct = fb['yield_pct']
-        ex_date_str = fb['ex_date']
-      else:
+      if not is_tracking:
+        if ticker in FALLBACK_DIVIDENDS:
+          fb = FALLBACK_DIVIDENDS[ticker]
+          div_rate = fb['div_rate']
+          yield_pct = fb['yield_pct']
+          ex_date_str = fb['ex_date']
+        else:
+          try:
+            divs = stock.dividends
+            if divs is not None and not divs.empty:
+              if divs.index.tz is not None:
+                divs.index = divs.index.tz_localize(None)
+              one_year_ago = datetime.utcnow() - pd.DateOffset(years=1)
+              recent_divs = divs[divs.index >= one_year_ago]
+              div_rate = recent_divs.sum()
+              if div_rate > 0:
+                yield_pct = (
+                    (div_rate / close_today) * 100 if close_today > 0 else 0.0
+                )
+                ex_date_str = divs.index[-1].strftime('%d/%m/%Y')
+          except Exception:
+            pass
+
+        if div_rate and div_rate > 0:
+          dividend_data.append({
+              'name': search_term,
+              'div_rate': div_rate,
+              'yield_pct': yield_pct,
+              'ex_date': ex_date_str,
+              'currency': currency,
+          })
+
+      # Análisis Técnico (RSI) - Solo principales
+      if not is_tracking:
         try:
-          divs = stock.dividends
-          if divs is not None and not divs.empty:
-            if divs.index.tz is not None:
-              divs.index = divs.index.tz_localize(None)
-            one_year_ago = datetime.utcnow() - pd.DateOffset(years=1)
-            recent_divs = divs[divs.index >= one_year_ago]
-            div_rate = recent_divs.sum()
-            if div_rate > 0:
-              yield_pct = (
-                  (div_rate / close_today) * 100 if close_today > 0 else 0.0
-              )
-              ex_date_str = divs.index[-1].strftime('%d/%m/%Y')
+          delta = hist['Close'].diff()
+          gain = delta.where(delta > 0, 0.0)
+          loss = -delta.where(delta < 0, 0.0)
+          avg_gain = gain.rolling(window=14).mean()
+          avg_loss = loss.rolling(window=14).mean()
+          rs = avg_gain / avg_loss
+          rsi = 100 - (100 / (1 + rs))
+          current_rsi = rsi.iloc[-1]
+
+          rsi_label = '🟠 Normal'
+          if current_rsi > 70:
+            rsi_label = '🔴 Sobrecompra (>70)'
+          elif current_rsi < 30:
+            rsi_label = '🟢 Sobreventa (<30)'
+
+          technical_data.append({
+              'name': search_term,
+              'rsi': current_rsi,
+              'rsi_label': rsi_label,
+          })
         except Exception:
           pass
 
-      if div_rate and div_rate > 0:
-        dividend_data.append({
-            'name': search_term,
-            'div_rate': div_rate,
-            'yield_pct': yield_pct,
-            'ex_date': ex_date_str,
-            'currency': currency,
-        })
-
-      # Análisis Técnico (RSI)
-      try:
-        delta = hist['Close'].diff()
-        gain = delta.where(delta > 0, 0.0)
-        loss = -delta.where(delta < 0, 0.0)
-        avg_gain = gain.rolling(window=14).mean()
-        avg_loss = loss.rolling(window=14).mean()
-        rs = avg_gain / avg_loss
-        rsi = 100 - (100 / (1 + rs))
-        current_rsi = rsi.iloc[-1]
-
-        rsi_label = '🟠 Normal'
-        if current_rsi > 70:
-          rsi_label = '🔴 Sobrecompra (>70)'
-        elif current_rsi < 30:
-          rsi_label = '🟢 Sobreventa (<30)'
-
-        technical_data.append({
-            'name': search_term,
-            'rsi': current_rsi,
-            'rsi_label': rsi_label,
-        })
-      except Exception:
-        pass
-
-      # Earnings
-      try:
-        cal = stock.calendar
-        edate_str = 'No programada'
-        if cal is not None:
-          if isinstance(cal, dict) and 'Earnings Date' in cal:
-            edates = cal['Earnings Date']
-            if edates:
-              edate_str = str(edates[0])[:10]
-          elif hasattr(cal, 'loc') and 'Earnings Date' in cal.index:
-            edate_str = str(cal.loc['Earnings Date'].values[0])[:10]
-        earnings_data.append({'name': search_term, 'date': edate_str})
-      except Exception:
-        earnings_data.append({'name': search_term, 'date': 'No disponible'})
+      # Earnings - Solo principales
+      if not is_tracking:
+        try:
+          cal = stock.calendar
+          edate_str = 'No programada'
+          if cal is not None:
+            if isinstance(cal, dict) and 'Earnings Date' in cal:
+              edates = cal['Earnings Date']
+              if edates:
+                edate_str = str(edates[0])[:10]
+            elif hasattr(cal, 'loc') and 'Earnings Date' in cal.index:
+              edate_str = str(cal.loc['Earnings Date'].values[0])[:10]
+          earnings_data.append({'name': search_term, 'date': edate_str})
+        except Exception:
+          earnings_data.append({'name': search_term, 'date': 'No disponible'})
 
       # --- ALERTAS EN TIEMPO REAL ---
       is_big_price_move = abs(price_change) >= 1.5
@@ -324,29 +368,18 @@ def check_market():
             should_alert_price = True
 
       should_alert_vol = False
-      vol_label = ''
-      if avg_volume > 0:
-        is_vol_high = vol_today >= avg_volume
-        if is_vol_high:
-          if last_vol_alerted is None:
-            should_alert_vol = True
-          else:
-            if vol_today >= (last_vol_alerted * 1.25):
-              should_alert_vol = True
+      if current_vol_tier > 0:
+        if last_vol_tier is None or current_vol_tier > last_vol_tier:
+          should_alert_vol = True
 
       if should_alert_price or should_alert_vol:
-        if should_alert_vol:
-          if vol_today >= (avg_volume * 2.0):
-            vol_label = '🚨 *¡Volumen doblado (200%+ vs media)!*'
-          else:
-            vol_label = '⚠️ *¡Volumen al 100% de la media!*'
-
         msg = (
             f'📊 *Alerta Mercado: {search_term}*\n'
             f'• *Precio:* {currency}{close_today:.2f} ({price_change:+.2f}%)\n'
             f'• *Volumen hoy:* {vol_today:,.0f}\n{vol_label}'
         )
-        send_telegram(msg)
+        target_thread = TRACKING_THREAD_ID if is_tracking else None
+        send_telegram(msg, thread_id=target_thread)
 
       # Actualizar estados de memoria por ticker y sesión
       if should_alert_price:
@@ -360,9 +393,9 @@ def check_market():
       if should_alert_vol:
         updated_volumes[ticker] = {
             'session': current_session,
-            'value': vol_today,
+            'value': current_vol_tier,
         }
-      elif last_vol_alerted is not None:
+      elif last_vol_tier is not None:
         updated_volumes[ticker] = saved_vol_data
 
     except Exception as e:
@@ -395,6 +428,22 @@ def check_market():
             f" (`{item['change']:+.2f}%`)"
         )
       send_telegram('\n'.join(summary_lines), thread_id=SUMMARY_THREAD_ID)
+
+    if tracking_summary_data:
+      tracking_summary_lines = [
+          '📊 *Resumen Cierre - Cartera Seguimiento* 📊',
+          f'📅 *Fecha:* {now_spain.strftime("%d/%m/%Y")}\n',
+      ]
+      tracking_summary_data.sort(key=lambda x: x['change'], reverse=True)
+      for item in tracking_summary_data:
+        emoji = '🟢' if item['change'] >= 0 else '🔴'
+        tracking_summary_lines.append(
+            f"{emoji} *{item['name']}*: {item['currency']}{item['price']:.2f}"
+            f" (`{item['change']:+.2f}%`)"
+        )
+      send_telegram(
+          '\n'.join(tracking_summary_lines), thread_id=TRACKING_THREAD_ID
+      )
 
     if dividend_data:
       now_date = now_spain.date()
