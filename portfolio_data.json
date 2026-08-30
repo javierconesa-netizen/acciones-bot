@@ -119,6 +119,10 @@
         "APPL": {
             "shares": 0.0,
             "buy_price": 0.0
+        },
+        "GOSS": {
+            "shares": 0.0,
+            "buy_price": 0.0
         }
     }
 }
