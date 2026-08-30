@@ -42,7 +42,7 @@
     "portfolio_positions": {
         "KO": {
             "shares": 3.0,
-            "buy_price": 0.0
+            "buy_price": 75.0
         },
         "NFLX": {
             "shares": 0.0,
