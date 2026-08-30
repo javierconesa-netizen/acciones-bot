@@ -134,20 +134,37 @@ FALLBACK_DIVIDENDS = {
 
 @st.cache_data(ttl=300)
 def get_comprehensive_market_data(tickers_tuple):
+  if not tickers_tuple:
+      return pd.DataFrame()
+  
   data = []
+  # Descarga optimizada en lote para mejorar el rendimiento
+  try:
+      hist_data = yf.download(list(tickers_tuple), period='3mo', progress=False, group_by='ticker')
+  except Exception:
+      hist_data = None
+
   for ticker in tickers_tuple:
     search_term = NAMES.get(ticker, ticker)
     try:
-      stock = yf.Ticker(ticker)
-      hist = stock.history(period='3mo')
+      if hist_data is not None and len(tickers_tuple) > 1:
+        try:
+          hist = hist_data[ticker].dropna(subset=['Close'])
+        except Exception:
+          stock = yf.Ticker(ticker)
+          hist = stock.history(period='3mo')
+      else:
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period='3mo')
+
       if len(hist) >= 2:
         today_data = hist.iloc[-1]
         prev_data = hist.iloc[-2]
 
-        close_today = today_data['Close']
-        close_prev = prev_data['Close']
-        vol_today = today_data['Volume']
-        avg_volume = hist['Volume'][:-1].mean() if len(hist) > 1 else vol_today
+        close_today = float(today_data['Close'])
+        close_prev = float(prev_data['Close'])
+        vol_today = float(today_data['Volume'])
+        avg_volume = float(hist['Volume'][:-1].mean()) if len(hist) > 1 else vol_today
 
         price_change_abs = close_today - close_prev
         price_change_pct = (price_change_abs / close_prev) * 100
@@ -161,7 +178,7 @@ def get_comprehensive_market_data(tickers_tuple):
         avg_loss = loss.rolling(window=14).mean()
         rs = avg_gain / avg_loss
         rsi = 100 - (100 / (1 + rs))
-        current_rsi = rsi.iloc[-1] if not rsi.empty else 50.0
+        current_rsi = float(rsi.iloc[-1]) if not rsi.empty else 50.0
 
         rsi_label = 'Normal'
         if current_rsi > 70:
@@ -181,13 +198,14 @@ def get_comprehensive_market_data(tickers_tuple):
           ex_date_str = fb['ex_date']
         else:
           try:
-            divs = stock.dividends
+            stock_div = yf.Ticker(ticker)
+            divs = stock_div.dividends
             if divs is not None and not divs.empty:
               if divs.index.tz is not None:
                 divs.index = divs.index.tz_localize(None)
               one_year_ago = datetime.utcnow() - pd.DateOffset(years=1)
               recent_divs = divs[divs.index >= one_year_ago]
-              div_rate = recent_divs.sum()
+              div_rate = float(recent_divs.sum())
               if div_rate > 0:
                 yield_pct = (div_rate / close_today) * 100 if close_today > 0 else 0.0
                 ex_date_str = divs.index[-1].strftime('%d/%m/%Y')
@@ -196,7 +214,8 @@ def get_comprehensive_market_data(tickers_tuple):
 
         edate_str = 'No programada'
         try:
-          cal = stock.calendar
+          stock_cal = yf.Ticker(ticker)
+          cal = stock_cal.calendar
           if cal is not None:
             if isinstance(cal, dict) and 'Earnings Date' in cal:
               edates = cal['Earnings Date']
@@ -275,7 +294,6 @@ with st.spinner('Actualizando mercados y descargando perfiles corporativos...'):
   df_track = get_comprehensive_market_data(tuple(st.session_state.tracking_tickers))
   all_news = fetch_google_news(tuple(list(st.session_state.tickers) + list(st.session_state.tracking_tickers)))
 
-# 6 pestañas principales (sin pestaña extra, el gestor va integrado con un popover junto al título)
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     '🚀 Principal',
     '🔍 Seguimiento',
@@ -326,6 +344,14 @@ with tab1:
     with col3:
         st.markdown(f'<div class="metric-card"><h4>🔻 Mayor Bajada</h4><h2>{worst_asset["Nombre"]} <span style="color: #da3633; font-size: 18px;">({worst_asset["Cambio (%)"]:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
 
+    # Botón de exportación a CSV profesional
+    csv_main = df_main_sorted.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Descargar Cartera Principal (CSV)",
+        data=csv_main,
+        file_name='cartera_principal.csv',
+        mime='text/csv',
+    )
     st.markdown('---')
     
     for index, row in df_main_sorted.iterrows():
@@ -375,6 +401,16 @@ with tab2:
 
   if not df_track.empty:
     df_track_sorted = df_track.sort_values(by='Cambio (%)', ascending=False)
+    
+    csv_track = df_track_sorted.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Descargar Seguimiento (CSV)",
+        data=csv_track,
+        file_name='cartera_seguimiento.csv',
+        mime='text/csv',
+    )
+    st.markdown('---')
+
     for index, row in df_track_sorted.iterrows():
         color_change = "#238636" if row['Cambio (%)'] >= 0 else "#da3633"
         sign = "+" if row['Cambio (%)'] >= 0 else ""
