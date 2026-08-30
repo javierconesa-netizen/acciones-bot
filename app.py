@@ -27,6 +27,30 @@ st.set_page_config(
     page_title='Mi Cartera', page_icon='💎', layout='wide'
 )
 
+def check_password():
+    def password_entered():
+        correct_password = st.secrets.get("PASSWORD", "1234")
+        if st.session_state["password"] == correct_password:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        st.markdown("### 🔐 Acceso Restringido")
+        st.text_input("Introduce la contraseña:", type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        st.markdown("### 🔐 Acceso Restringido")
+        st.text_input("Introduce la contraseña:", type="password", on_change=password_entered, key="password")
+        st.error("😕 Contraseña incorrecta")
+        return False
+    else:
+        return True
+
+if not check_password():
+    st.stop()
+
 st.markdown("""
     <style>
     .stApp {
@@ -289,7 +313,6 @@ with col_gear:
                 st.markdown(f"**{asset_display_name} ({t})**")
                 current_pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
                 
-                # Configurar precisión decimal alta para Bitcoin
                 if 'BTC' in t:
                     sh = st.number_input(f"Acciones {t}", value=float(current_pos.get('shares', 0.0)), min_value=0.0, step=0.00001, format="%.5f", key=f"shares_{t}")
                 else:
@@ -436,7 +459,6 @@ if not df_main.empty:
             p_color = "#3fb950" if diff >= 0 else "#f85149"
             p_sign = "+" if diff >= 0 else ""
             
-            # Mostrar más decimales en las unidades si es Bitcoin
             shares_str = f"{sh:.5f}".rstrip('0').rstrip('.') if 'BTC' in t else f"{sh:g}"
             pos_html = f'<div style="background: rgba(19, 27, 46, 0.8); border-left: 3px solid {p_color}; margin-top: 8px; padding: 6px 8px; border-radius: 4px; font-size: 11px; display: flex; justify-content: space-between; align-items: center;"><span>💼 {shares_str} acc.</span><span style="color: {p_color}; font-weight: bold;">{p_sign}{row["Moneda"]}{diff:,.2f} ({p_sign}{diff_pct:.1f}%)</span></div>'
 
