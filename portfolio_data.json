@@ -17,7 +17,8 @@
         "RZLV",
         "LAES",
         "BTC-USD",
-        "MU"
+        "MU",
+        "AAPL"
     ],
     "custom_names": {
         "KO": "Coca-Cola",
@@ -37,7 +38,8 @@
         "SLNH": "Soluna Holdings",
         "RZLV": "Rezolve AI",
         "LAES": "Sealsq / LAES",
-        "MU": "Micron Technology, Inc."
+        "MU": "Micron Technology, Inc.",
+        "AAPL": "Apple Inc."
     },
     "portfolio_positions": {
         "KO": {
