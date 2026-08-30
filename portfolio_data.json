@@ -1,0 +1,110 @@
+{
+    "tickers": [
+        "KO",
+        "NFLX",
+        "MC.PA",
+        "NOV.DE",
+        "ACHR",
+        "TSM",
+        "OPEN",
+        "NVDA",
+        "IREN",
+        "ASTS",
+        "ONDS",
+        "RKLB",
+        "GOOGL",
+        "SLNH",
+        "RZLV",
+        "LAES",
+        "BTC-USD"
+    ],
+    "custom_names": {
+        "KO": "Coca-Cola",
+        "MC.PA": "LVMH",
+        "BTC-USD": "Bitcoin",
+        "NOV.DE": "Novo Nordisk",
+        "OPEN": "Opendoor Technologies",
+        "NFLX": "Netflix",
+        "NVDA": "NVIDIA",
+        "TSM": "TSMC",
+        "GOOGL": "Alphabet (Google)",
+        "ACHR": "Archer Aviation",
+        "IREN": "Iris Energy",
+        "ASTS": "AST SpaceMobile",
+        "ONDS": "Ondas Holdings",
+        "RKLB": "Rocket Lab",
+        "SLNH": "Soluna Holdings",
+        "RZLV": "Rezolve AI",
+        "LAES": "Sealsq / LAES"
+    },
+    "portfolio_positions": {
+        "KO": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "NFLX": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "MC.PA": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "NOV.DE": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "ACHR": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "TSM": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "OPEN": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "NVDA": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "IREN": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "ASTS": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "ONDS": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "RKLB": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "GOOGL": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "SLNH": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "RZLV": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "LAES": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        },
+        "BTC-USD": {
+            "shares": 0.0,
+            "buy_price": 0.0
+        }
+    }
+}
