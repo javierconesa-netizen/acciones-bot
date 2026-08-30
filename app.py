@@ -1,7 +1,25 @@
+import sys
+import os
+
+packages_dir = "/tmp/pip_packages"
+os.makedirs(packages_dir, exist_ok=True)
+if packages_dir not in sys.path:
+    sys.path.insert(0, packages_dir)
+
+try:
+    import yfinance as yf
+except ImportError:
+    import subprocess
+    subprocess.check_call([
+        sys.executable, "-m", "pip", "install", 
+        "yfinance", "lxml", "beautifulsoup4", "multitasking", "websockets<17", 
+        "--target", packages_dir
+    ])
+    import yfinance as yf
+
 from datetime import datetime
 import pandas as pd
 import streamlit as st
-import yfinance as yf
 
 # Configuración de la página web
 st.set_page_config(
