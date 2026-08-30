@@ -302,11 +302,7 @@ if not df_main.empty:
             hist_val = row[perf_col]
             color_hist = "#3fb950" if hist_val >= 0 else "#f85149"
             sign_hist = "+" if hist_val >= 0 else ""
-            hist_badge = f'''
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 12px; color: #8b949e;">
-                <span>{tf_label}:</span>
-                <span style="background: {color_hist}22; color: {color_hist}; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px;">{sign_hist}{hist_val:.2f}%</span>
-            </div>'''
+            hist_badge = f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 12px; color: #8b949e;"><span>{tf_label}:</span><span style="background: {color_hist}22; color: {color_hist}; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px;">{sign_hist}{hist_val:.2f}%</span></div>'
 
         t = row['Ticker']
         pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
@@ -321,31 +317,9 @@ if not df_main.empty:
             diff_pct = (diff / inv_val) * 100
             p_color = "#3fb950" if diff >= 0 else "#f85149"
             p_sign = "+" if diff >= 0 else ""
-            pos_html = f'''
-            <div style="background: rgba(22, 27, 34, 0.7); border-left: 3px solid {p_color}; margin-top: 10px; padding: 8px 10px; border-radius: 6px; font-size: 11px; display: flex; justify-content: space-between; align-items: center;">
-                <span>💼 <b>{sh:g}</b> acc.</span>
-                <span style="color: {p_color}; font-weight: bold;">{p_sign}{row["Moneda"]}{diff:,.2f} ({p_sign}{diff_pct:.1f}%)</span>
-            </div>'''
+            pos_html = f'<div style="background: rgba(22, 27, 34, 0.7); border-left: 3px solid {p_color}; margin-top: 10px; padding: 8px 10px; border-radius: 6px; font-size: 11px; display: flex; justify-content: space-between; align-items: center;"><span>💼 <b>{sh:g}</b> acc.</span><span style="color: {p_color}; font-weight: bold;">{p_sign}{row["Moneda"]}{diff:,.2f} ({p_sign}{diff_pct:.1f}%)</span></div>'
 
-        card_html = f'''
-        <div style="background: linear-gradient(145deg, #161b22 0%, #0d1117 100%); border: 1px solid #30363d; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); transition: all 0.2s ease-in-out;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <span style="font-size: 14px; font-weight: bold; color: #f0f6fc;">{row["Nombre"]}</span>
-                    <span style="color: #8b949e; font-size: 11px; margin-left: 6px; background: #21262d; padding: 2px 6px; border-radius: 4px;">{row["Ticker"]}</span>
-                </div>
-                <div style="text-align: right;">
-                    <span style="font-size: 17px; font-weight: 800; color: #ffffff;">{row["Moneda"]}{row["Precio"]:.3f}</span>
-                </div>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 12px; color: #8b949e;">
-                <span>Hoy:</span>
-                <span style="background: {color_daily}22; color: {color_daily}; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px;">{sign_daily}{row["Cambio (%)"]:.2f}%</span>
-            </div>
-            {hist_badge}
-            {pos_html}
-        </div>'''
+        card_html = f'<div style="background: linear-gradient(145deg, #161b22 0%, #0d1117 100%); border: 1px solid #30363d; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.4);"><div style="display: flex; justify-content: space-between; align-items: flex-start;"><div><span style="font-size: 14px; font-weight: bold; color: #f0f6fc;">{row["Nombre"]}</span><span style="color: #8b949e; font-size: 11px; margin-left: 6px; background: #21262d; padding: 2px 6px; border-radius: 4px;">{row["Ticker"]}</span></div><div style="text-align: right;"><span style="font-size: 17px; font-weight: 800; color: #ffffff;">{row["Moneda"]}{row["Precio"]:.3f}</span></div></div><div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 12px; color: #8b949e;"><span>Hoy:</span><span style="background: {color_daily}22; color: {color_daily}; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px;">{sign_daily}{row["Cambio (%)"]:.2f}%</span></div>{hist_badge}{pos_html}</div>'
 
         st.markdown(card_html, unsafe_allow_html=True)
 
