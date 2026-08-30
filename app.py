@@ -23,7 +23,7 @@ except ImportError:
     import yfinance as yf
 
 st.set_page_config(
-    page_title='Panel Financiero Profesional', page_icon='💎', layout='wide'
+    page_title='Mi Cartera', page_icon='💎', layout='wide'
 )
 
 st.markdown("""
@@ -163,18 +163,12 @@ def get_comprehensive_market_data_extended(tickers_tuple):
             print(f'Error procesando {ticker}: {e}')
     return pd.DataFrame(data)
 
-st.title('💎 Mi Cartera de Inversión')
+st.title('Mi Cartera')
 st.markdown(f'<p style="color: #8b949e; font-size: 15px;">🚀 Sincronización en tiempo real — Actualizado a fecha: {datetime.now().strftime("%d/%m/%Y %H:%M")}</p>', unsafe_allow_html=True)
 
-with st.spinner('Actualizando mercados y posiciones...'):
-    df_main = get_comprehensive_market_data_extended(tuple(st.session_state.tickers))
-
-col_h, col_b = st.columns([3, 1])
-with col_h:
-    st.subheader('🚀 Panel de Control y Posiciones')
-with col_b:
-    with st.popover("⚙️ Gestionar Activos"):
-        st.markdown("### Tickers")
+with st.sidebar:
+    st.header("⚙️ Panel de Control")
+    with st.expander("Gestionar Activos", expanded=True):
         new_m = st.text_input('Añadir ticker (ej: AAPL, SLNH):', key='pop_new_main')
         if st.button('➕ Añadir', key='pop_btn_main'):
             clean_m = new_m.strip().upper()
@@ -207,21 +201,18 @@ with col_b:
                 else:
                     st.text('Mín 1')
 
-with st.expander("💼 Configurar mis posiciones (Acciones y Precio de Compra)"):
-    st.markdown("Introduce tus datos por activo para calcular plusvalías/minusvalías reales:")
-    for t in st.session_state.tickers:
-        c_p1, c_p2, c_p3 = st.columns([2, 2, 2])
-        asset_display_name = st.session_state.custom_names.get(t, t)
-        with c_p1:
+    with st.expander("💼 Configurar Posiciones"):
+        st.markdown("Introduce tus datos por activo:")
+        for t in st.session_state.tickers:
+            asset_display_name = st.session_state.custom_names.get(t, t)
             st.markdown(f"**{asset_display_name} ({t})**")
-        
-        current_pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
-        with c_p2:
+            current_pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
             sh = st.number_input(f"Acciones {t}", value=float(current_pos.get('shares', 0.0)), min_value=0.0, step=1.0, key=f"shares_{t}")
-        with c_p3:
             bp = st.number_input(f"Precio Compra {t}", value=float(current_pos.get('buy_price', 0.0)), min_value=0.0, step=0.01, key=f"buy_price_{t}")
-        
-        st.session_state.portfolio_positions[t] = {'shares': sh, 'buy_price': bp}
+            st.session_state.portfolio_positions[t] = {'shares': sh, 'buy_price': bp}
+
+with st.spinner('Actualizando mercados y posiciones...'):
+    df_main = get_comprehensive_market_data_extended(tuple(st.session_state.tickers))
 
 if not df_main.empty:
     total_invested = 0.0
@@ -259,12 +250,13 @@ if not df_main.empty:
     c_f1, c_f2 = st.columns(2)
     with c_f1:
         timeframe_label = st.selectbox(
-            "⏱️ Seleccionar Periodo Histórico", 
-            ['1 Mes', '3 Meses', '6 Meses', '1 Año', 'Año en curso (YTD)'],
+            "⏱️ Seleccionar Periodo", 
+            ['Actual', '1 Mes', '3 Meses', '6 Meses', '1 Año', 'Año en curso (YTD)'],
             key='main_tf_select'
         )
     
     tf_mapping = {
+        'Actual': 'Cambio (%)',
         '1 Mes': 'Perf_1M',
         '3 Meses': 'Perf_3M',
         '6 Meses': 'Perf_6M',
@@ -278,9 +270,20 @@ if not df_main.empty:
             "🔄 Ordenar Cartera por", 
             ['Cambio Diario (%) [Mayor a Menor]', 'Cambio Diario (%) [Menor a Mayor]', 
              f'Histórico ({timeframe_label}) [Mayor a Menor]', f'Histórico ({timeframe_label}) [Menor a Mayor]',
-             'P&L Histórico Absoluto (€/$) [Mayor a Menor]'],
+             'Ganancias Reales (€) [Mayor a Menor]', 'Ganancias Reales (€) [Menor a Mayor]'],
             key='main_sort_select'
         )
+
+    def calc_abs_pl(row):
+        t = row['Ticker']
+        pos = st.session_state.portfolio_positions.get(t, {})
+        sh = pos.get('shares', 0.0)
+        bp = pos.get('buy_price', 0.0)
+        if sh > 0 and bp > 0:
+            return (row['Precio'] - bp) * sh
+        return 0.0
+
+    df_main['Temp_P_L'] = df_main.apply(calc_abs_pl, axis=1)
 
     if 'Diario (%) [Mayor a Menor]' in sort_option:
         df_main = df_main.sort_values(by='Cambio (%)', ascending=False)
@@ -290,19 +293,12 @@ if not df_main.empty:
         df_main = df_main.sort_values(by=active_perf_col, ascending=False)
     elif '[Menor a Mayor]' in sort_option and 'Histórico' in sort_option:
         df_main = df_main.sort_values(by=active_perf_col, ascending=True)
-    elif 'P&L Histórico Absoluto' in sort_option:
-        def calc_abs_pl(row):
-            t = row['Ticker']
-            pos = st.session_state.portfolio_positions.get(t, {})
-            sh = pos.get('shares', 0.0)
-            bp = pos.get('buy_price', 0.0)
-            if sh > 0 and bp > 0:
-                return (row['Precio'] - bp) * sh
-            return 0.0
-        df_main['Temp_P_L'] = df_main.apply(calc_abs_pl, axis=1)
+    elif 'Ganancias Reales (€) [Mayor a Menor]' in sort_option:
         df_main = df_main.sort_values(by='Temp_P_L', ascending=False)
+    elif 'Ganancias Reales (€) [Menor a Mayor]' in sort_option:
+        df_main = df_main.sort_values(by='Temp_P_L', ascending=True)
 
-    csv_main = df_main.to_csv(index=False).encode('utf-8')
+    csv_main = df_main.drop(columns=['Temp_P_L']).to_csv(index=False).encode('utf-8')
     st.download_button(
         label="📥 Descargar Cartera Principal (CSV)",
         data=csv_main,
