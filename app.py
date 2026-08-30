@@ -29,33 +29,25 @@ st.set_page_config(
 
 def check_password():
     correct_password = st.secrets.get("PASSWORD", "1234")
-    token = base64.b64encode(correct_password.encode()).decode()
     
-    if st.session_state.get("password_correct", False):
-        return True
+    def password_entered():
+        if st.session_state["password"] == correct_password:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]
+        else:
+            st.session_state["password_correct"] = False
 
-    query_auth = st.query_params.get("auth", "")
-    if isinstance(query_auth, list):
-        query_auth = query_auth[0] if query_auth else ""
-        
-    if query_auth == token:
-        st.session_state["password_correct"] = True
+    if "password_correct" not in st.session_state:
+        st.markdown("### 🔐 Acceso Restringido")
+        st.text_input("Introduce la contraseña:", type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        st.markdown("### 🔐 Acceso Restringido")
+        st.text_input("Introduce la contraseña:", type="password", on_change=password_entered, key="password")
+        st.error("😕 Contraseña incorrecta")
+        return False
+    else:
         return True
-
-    st.markdown("### 🔐 Acceso Restringido")
-    with st.form("password_form"):
-        entered_password = st.text_input("Introduce la contraseña:", type="password")
-        submit_button = st.form_submit_button("Entrar")
-        
-        if submit_button:
-            if entered_password == correct_password:
-                st.session_state["password_correct"] = True
-                st.query_params["auth"] = token
-                st.rerun()
-            else:
-                st.error("😕 Contraseña incorrecta")
-                
-    return False
 
 if not check_password():
     st.stop()
