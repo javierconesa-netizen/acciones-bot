@@ -75,6 +75,17 @@ st.markdown("""
         border-right: 1px solid #30363d;
         border-bottom: 1px solid #30363d;
     }
+    .ticker-badge {
+        background: #21262d;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 6px 2px;
+        text-align: center;
+        font-weight: bold;
+        color: #58a6ff;
+        font-size: 11px;
+        letter-spacing: 0.5px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -108,28 +119,6 @@ NAMES = {
     'BSIN': 'Black Spade Acquisition'
 }
 
-DOMAINS = {
-    'KO': 'coca-cola.com',
-    'NFLX': 'netflix.com',
-    'MC.PA': 'lvmh.com',
-    'NOV.DE': 'novonordisk.com',
-    'ACHR': 'archer.com',
-    'TSM': 'tsmc.com',
-    'OPEN': 'opendoor.com',
-    'NVDA': 'nvidia.com',
-    'IREN': 'iren.com',
-    'ASTS': 'asts.com',
-    'ONDS': 'ondas.com',
-    'RKLB': 'rocketlabusa.com',
-    'GOOGL': 'google.com',
-    'SLNH': 'silvernew.com',
-    'RZLV': 'rezolve.com',
-    'LAES': 'laes.com',
-    'BTC-USD': 'bitcoin.org',
-    'GOSS': 'gossamerbio.com',
-    'BSIN': 'blackspadeacquisition.com'
-}
-
 FALLBACK_DIVIDENDS = {
     'KO': {'div_rate': 1.94, 'yield_pct': 3.10, 'ex_date': '15/09/2026'},
     'MC.PA': {'div_rate': 13.00, 'yield_pct': 2.05, 'ex_date': '28/10/2026'},
@@ -144,9 +133,6 @@ def get_comprehensive_market_data(tickers_list):
   data = []
   for ticker in tickers_list:
     search_term = NAMES.get(ticker, ticker)
-    domain = DOMAINS.get(ticker, "")
-    logo_url = f"https://logo.clearbit.com/{domain}" if domain else ""
-    
     try:
       stock = yf.Ticker(ticker)
       hist = stock.history(period='3mo')
@@ -219,7 +205,6 @@ def get_comprehensive_market_data(tickers_list):
         data.append({
             'Ticker': ticker,
             'Nombre': search_term,
-            'Logo': logo_url,
             'Precio': close_today,
             'Moneda': currency,
             'Cambio (%)': price_change,
@@ -317,15 +302,15 @@ with tab1:
         
         c1, c2, c3, c4, c5 = st.columns([0.6, 2.2, 1.2, 1.2, 1.5])
         with c1:
-            st.image(row['Logo'], width=35, output_format='png')
+            st.markdown(f'<div class="ticker-badge">{row["Ticker"]}</div>', unsafe_allow_html=True)
         with c2:
-            st.markdown(f"**{row['Nombre']}**  \n<span style='color: #8b949e; font-size: 12px;'>{row['Ticker']}</span>", unsafe_allow_html=True)
+            st.markdown(f"**{row['Nombre']}**", unsafe_allow_html=True)
         with c3:
             st.markdown(f"**{row['Moneda']}{row['Precio']:.2f}**")
         with c4:
             st.markdown(f"<span style='color: {color_change}; font-weight: bold;'>{sign}{row['Cambio (%)']:.2f}%</span>", unsafe_allow_html=True)
         with c5:
-            st.markdown(f"<span style='color: #8b949e; font-size: 13px;'>Vol vs Media: <b>{row['Volumen vs Media (%)']:.0f}%</b></span>", unsafe_allow_html=True)
+            st.markdown(f"<span style='color: #8b949e; font-size: 13px;'>Vol: <b>{row['Volumen vs Media (%)']:.0f}%</b></span>", unsafe_allow_html=True)
         st.markdown("<hr style='margin: 5px 0px; border-color: #21262d;'>", unsafe_allow_html=True)
 
 with tab2:
@@ -338,27 +323,27 @@ with tab2:
         
         c1, c2, c3, c4, c5 = st.columns([0.6, 2.2, 1.2, 1.2, 1.5])
         with c1:
-            st.image(row['Logo'], width=35, output_format='png')
+            st.markdown(f'<div class="ticker-badge">{row["Ticker"]}</div>', unsafe_allow_html=True)
         with c2:
-            st.markdown(f"**{row['Nombre']}**  \n<span style='color: #8b949e; font-size: 12px;'>{row['Ticker']}</span>", unsafe_allow_html=True)
+            st.markdown(f"**{row['Nombre']}**", unsafe_allow_html=True)
         with c3:
             st.markdown(f"**{row['Moneda']}{row['Precio']:.2f}**")
         with c4:
             st.markdown(f"<span style='color: {color_change}; font-weight: bold;'>{sign}{row['Cambio (%)']:.2f}%</span>", unsafe_allow_html=True)
         with c5:
-            st.markdown(f"<span style='color: #8b949e; font-size: 13px;'>Vol vs Media: <b>{row['Volumen vs Media (%)']:.0f}%</b></span>", unsafe_allow_html=True)
+            st.markdown(f"<span style='color: #8b949e; font-size: 13px;'>Vol: <b>{row['Volumen vs Media (%)']:.0f}%</b></span>", unsafe_allow_html=True)
         st.markdown("<hr style='margin: 5px 0px; border-color: #21262d;'>", unsafe_allow_html=True)
 
 with tab3:
   st.subheader('📈 Análisis Técnico (Indicador RSI 14 Periodos)')
   if not df_main.empty:
-    df_rsi = df_main[['Ticker', 'Nombre', 'Logo', 'RSI', 'RSI_Label']].sort_values(by='RSI', ascending=False)
+    df_rsi = df_main[['Ticker', 'Nombre', 'RSI', 'RSI_Label']].sort_values(by='RSI', ascending=False)
     for index, row in df_rsi.iterrows():
         c1, c2, c3, c4 = st.columns([0.6, 2.5, 1.5, 2.4])
         with c1:
-            st.image(row['Logo'], width=35)
+            st.markdown(f'<div class="ticker-badge">{row["Ticker"]}</div>', unsafe_allow_html=True)
         with c2:
-            st.markdown(f"**{row['Nombre']}** ({row['Ticker']})")
+            st.markdown(f"**{row['Nombre']}**")
         with c3:
             st.markdown(f"RSI: **{row['RSI']:.1f}**")
         with c4:
@@ -373,22 +358,22 @@ with tab4:
         if row['Yield_Pct'] > 0:
             c1, c2, c3, c4 = st.columns([0.6, 2.5, 1.8, 2.1])
             with c1:
-                st.image(row['Logo'], width=35)
+                st.markdown(f'<div class="ticker-badge">{row["Ticker"]}</div>', unsafe_allow_html=True)
             with c2:
                 st.markdown(f"**{row['Nombre']}**")
             with c3:
                 st.markdown(f"Ex-Fecha: <b>{row['Ex_Date']}</b>", unsafe_allow_html=True)
             with c4:
-                st.markdown(f"Rentabilidad: <span style='color: #238636; font-weight: bold;'>{row['Yield_Pct']:.2f}%</span> ({row['Moneda']}{row['Div_Rate']:.2f})", unsafe_allow_html=True)
+                st.markdown(f"Rentabilidad: <span style='color: #238636; font-weight: bold;'>{row['Yield_Pct']:.2f}%</span>", unsafe_allow_html=True)
             st.markdown("<hr style='margin: 5px 0px; border-color: #21262d;'>", unsafe_allow_html=True)
 
     st.markdown('<br>### 📊 Próximos Resultados (Earnings)', unsafe_allow_html=True)
     for index, row in df_main.iterrows():
         c1, c2, c3 = st.columns([0.6, 3.0, 3.0])
         with c1:
-            st.image(row['Logo'], width=35)
+            st.markdown(f'<div class="ticker-badge">{row["Ticker"]}</div>', unsafe_allow_html=True)
         with c2:
-            st.markdown(f"**{row['Nombre']}** ({row['Ticker']})")
+            st.markdown(f"**{row['Nombre']}**")
         with c3:
             st.markdown(f"📅 Fecha estimada: **{row['Earnings']}**")
         st.markdown("<hr style='margin: 5px 0px; border-color: #21262d;'>", unsafe_allow_html=True)
