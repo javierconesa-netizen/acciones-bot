@@ -19,7 +19,8 @@
         "BTC-USD",
         "MU",
         "APPL",
-        "GOSS"
+        "GOSS",
+        "AAPL"
     ],
     "custom_names": {
         "KO": "Coca-Cola",
@@ -41,7 +42,8 @@
         "LAES": "Sealsq / LAES",
         "MU": "Micron Technology, Inc.",
         "APPL": "APPL",
-        "GOSS": "Gossamer Bio, Inc."
+        "GOSS": "Gossamer Bio, Inc.",
+        "AAPL": "Apple Inc."
     },
     "portfolio_positions": {
         "KO": {
