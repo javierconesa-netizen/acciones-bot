@@ -1,4 +1,12 @@
-from datetime import datetime
+import subprocess
+import sys
+
+try:
+  import yfinance as yf
+except ImportError:
+  subprocess.check_call([sys.executable, "-m", "pip", "install", "yfinance"])
+  import yfinance as yf
+    from datetime import datetime
 import pandas as pd
 import streamlit as st
 import yfinance as yf
