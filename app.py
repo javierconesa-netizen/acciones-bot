@@ -163,53 +163,59 @@ def get_comprehensive_market_data_extended(tickers_tuple):
             print(f'Error procesando {ticker}: {e}')
     return pd.DataFrame(data)
 
-st.title('Mi Cartera')
-st.markdown(f'<p style="color: #8b949e; font-size: 15px;">🚀 Sincronización en tiempo real — Actualizado a fecha: {datetime.now().strftime("%d/%m/%Y %H:%M")}</p>', unsafe_allow_html=True)
+# Cabecera principal con Título y Botón de Ajustes (Engranaje)
+col_title, col_gear = st.columns([5, 1])
+with col_title:
+    st.title('Mi Cartera')
+    st.markdown(f'<p style="color: #8b949e; font-size: 15px; margin-top: -10px;">🚀 Sincronización en tiempo real — Actualizado a fecha: {datetime.now().strftime("%d/%m/%Y %H:%M")}</p>', unsafe_allow_html=True)
 
-with st.sidebar:
-    st.header("⚙️ Panel de Control")
-    with st.expander("Gestionar Activos", expanded=True):
-        new_m = st.text_input('Añadir ticker (ej: AAPL, SLNH):', key='pop_new_main')
-        if st.button('➕ Añadir', key='pop_btn_main'):
-            clean_m = new_m.strip().upper()
-            if clean_m and clean_m not in st.session_state.tickers:
-                with st.spinner(f"Consultando información de {clean_m}..."):
-                    try:
-                        tk_info = yf.Ticker(clean_m).info
-                        fetched_name = tk_info.get('longName') or tk_info.get('shortName') or clean_m
-                    except Exception:
-                        fetched_name = clean_m
-                    
-                    st.session_state.tickers.append(clean_m)
-                    st.session_state.custom_names[clean_m] = fetched_name
-                    st.success(f'¡{fetched_name} ({clean_m}) añadido!')
-                    st.rerun()
-        st.markdown('**Activos actuales:**')
-        for t in list(st.session_state.tickers):
-            cc1, cc2 = st.columns([3, 1])
-            with cc1:
-                st.text(f"{st.session_state.custom_names.get(t, t)} ({t})")
-            with cc2:
-                if len(st.session_state.tickers) > 1:
-                    if st.button('🗑️', key=f'pop_del_m_{t}'):
-                        st.session_state.tickers.remove(t)
-                        if t in st.session_state.portfolio_positions:
-                            del st.session_state.portfolio_positions[t]
-                        if t in st.session_state.custom_names:
-                            del st.session_state.custom_names[t]
+with col_gear:
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    with st.popover("⚙️", help="Panel de Control"):
+        st.markdown("### ⚙️ Panel de Control")
+        
+        with st.expander("Gestionar Activos", expanded=True):
+            new_m = st.text_input('Añadir ticker (ej: AAPL, SLNH):', key='pop_new_main')
+            if st.button('➕ Añadir', key='pop_btn_main'):
+                clean_m = new_m.strip().upper()
+                if clean_m and clean_m not in st.session_state.tickers:
+                    with st.spinner(f"Consultando información de {clean_m}..."):
+                        try:
+                            tk_info = yf.Ticker(clean_m).info
+                            fetched_name = tk_info.get('longName') or tk_info.get('shortName') or clean_m
+                        except Exception:
+                            fetched_name = clean_m
+                        
+                        st.session_state.tickers.append(clean_m)
+                        st.session_state.custom_names[clean_m] = fetched_name
+                        st.success(f'¡{fetched_name} ({clean_m}) añadido!')
                         st.rerun()
-                else:
-                    st.text('Mín 1')
+            st.markdown('**Activos actuales:**')
+            for t in list(st.session_state.tickers):
+                cc1, cc2 = st.columns([3, 1])
+                with cc1:
+                    st.text(f"{st.session_state.custom_names.get(t, t)} ({t})")
+                with cc2:
+                    if len(st.session_state.tickers) > 1:
+                        if st.button('🗑️', key=f'pop_del_m_{t}'):
+                            st.session_state.tickers.remove(t)
+                            if t in st.session_state.portfolio_positions:
+                                del st.session_state.portfolio_positions[t]
+                            if t in st.session_state.custom_names:
+                                del st.session_state.custom_names[t]
+                            st.rerun()
+                    else:
+                        st.text('Mín 1')
 
-    with st.expander("💼 Configurar Posiciones"):
-        st.markdown("Introduce tus datos por activo:")
-        for t in st.session_state.tickers:
-            asset_display_name = st.session_state.custom_names.get(t, t)
-            st.markdown(f"**{asset_display_name} ({t})**")
-            current_pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
-            sh = st.number_input(f"Acciones {t}", value=float(current_pos.get('shares', 0.0)), min_value=0.0, step=1.0, key=f"shares_{t}")
-            bp = st.number_input(f"Precio Compra {t}", value=float(current_pos.get('buy_price', 0.0)), min_value=0.0, step=0.01, key=f"buy_price_{t}")
-            st.session_state.portfolio_positions[t] = {'shares': sh, 'buy_price': bp}
+        with st.expander("💼 Configurar Posiciones"):
+            st.markdown("Introduce tus datos por activo:")
+            for t in st.session_state.tickers:
+                asset_display_name = st.session_state.custom_names.get(t, t)
+                st.markdown(f"**{asset_display_name} ({t})**")
+                current_pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
+                sh = st.number_input(f"Acciones {t}", value=float(current_pos.get('shares', 0.0)), min_value=0.0, step=1.0, key=f"shares_{t}")
+                bp = st.number_input(f"Precio Compra {t}", value=float(current_pos.get('buy_price', 0.0)), min_value=0.0, step=0.01, key=f"buy_price_{t}")
+                st.session_state.portfolio_positions[t] = {'shares': sh, 'buy_price': bp}
 
 with st.spinner('Actualizando mercados y posiciones...'):
     df_main = get_comprehensive_market_data_extended(tuple(st.session_state.tickers))
