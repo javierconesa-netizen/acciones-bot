@@ -89,13 +89,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-TICKERS = [
-    'KO', 'NFLX', 'MC.PA', 'NOV.DE', 'ACHR', 'TSM', 'OPEN', 
-    'NVDA', 'IREN', 'ASTS', 'ONDS', 'RKLB', 'GOOGL', 'SLNH', 
-    'RZLV', 'LAES', 'BTC-USD'
-]
+# Inicializar listas en st.session_state para permitir agregar/quitar dinámicamente
+if 'tickers' not in st.session_state:
+    st.session_state.tickers = [
+        'KO', 'NFLX', 'MC.PA', 'NOV.DE', 'ACHR', 'TSM', 'OPEN', 
+        'NVDA', 'IREN', 'ASTS', 'ONDS', 'RKLB', 'GOOGL', 'SLNH', 
+        'RZLV', 'LAES', 'BTC-USD'
+    ]
 
-TRACKING_TICKERS = ['GOSS', 'BSIN']
+if 'tracking_tickers' not in st.session_state:
+    st.session_state.tracking_tickers = ['GOSS', 'BSIN']
 
 NAMES = {
     'KO': 'Coca-Cola',
@@ -128,10 +131,44 @@ FALLBACK_DIVIDENDS = {
     'GOOGL': {'div_rate': 0.80, 'yield_pct': 0.45, 'ex_date': 'Próximamente'},
 }
 
+# Panel Lateral para Gestión de Tickers
+st.sidebar.header("⚙️ Gestión de Cartera")
+
+st.sidebar.subheader("🚀 Cartera Principal")
+selected_main = st.sidebar.multiselect(
+    "Activos en Principal:",
+    options=st.session_state.tickers,
+    default=st.session_state.tickers
+)
+st.session_state.tickers = selected_main
+
+new_main_ticker = st.sidebar.text_input("Añadir nuevo a Principal (ej: AAPL):")
+if st.sidebar.button("Agregar Principal") and new_main_ticker:
+    clean_ticker = new_main_ticker.strip().upper()
+    if clean_ticker and clean_ticker not in st.session_state.tickers:
+        st.session_state.tickers.append(clean_ticker)
+        st.rerun()
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔍 Cartera de Seguimiento")
+selected_tracking = st.sidebar.multiselect(
+    "Activos en Seguimiento:",
+    options=st.session_state.tracking_tickers,
+    default=st.session_state.tracking_tickers
+)
+st.session_state.tracking_tickers = selected_tracking
+
+new_track_ticker = st.sidebar.text_input("Añadir nuevo a Seguimiento (ej: TSLA):")
+if st.sidebar.button("Agregar Seguimiento") and new_track_ticker:
+    clean_track = new_track_ticker.strip().upper()
+    if clean_track and clean_track not in st.session_state.tracking_tickers:
+        st.session_state.tracking_tickers.append(clean_track)
+        st.rerun()
+
 @st.cache_data(ttl=300)
-def get_comprehensive_market_data(tickers_list):
+def get_comprehensive_market_data(tickers_tuple):
   data = []
-  for ticker in tickers_list:
+  for ticker in tickers_tuple:
     search_term = NAMES.get(ticker, ticker)
     try:
       stock = yf.Ticker(ticker)
@@ -224,14 +261,14 @@ def get_comprehensive_market_data(tickers_list):
   return pd.DataFrame(data)
 
 @st.cache_data(ttl=600)
-def fetch_google_news(tickers_list):
+def fetch_google_news(tickers_tuple):
     forbidden_words = [
         'tenis', 'alcaraz', 'williams', 'us open', 'partido', 'torneo',
         'enfrentamiento', 'deporte', 'fútbol', 'boxeo', 'muay thai',
         'combate', 'ufc', 'mma', 'ejercicios', 'entrenamiento', 'método ko',
     ]
     news_items = []
-    for ticker in tickers_list:
+    for ticker in tickers_tuple:
         search_term = NAMES.get(ticker, ticker)
         try:
             url = f'https://news.google.com/rss/search?q={search_term}&hl=es&gl=ES&ceid=ES:es'
@@ -267,9 +304,10 @@ st.title('💎 Terminal de Inversión y Seguimiento Financiero')
 st.markdown(f'<p style="color: #8b949e; font-size: 15px;">🚀 Sincronización en tiempo real — Actualizado a fecha: {datetime.now().strftime("%d/%m/%Y %H:%M")}</p>', unsafe_allow_html=True)
 
 with st.spinner('Actualizando mercados y descargando perfiles corporativos...'):
-  df_main = get_comprehensive_market_data(TICKERS)
-  df_track = get_comprehensive_market_data(TRACKING_TICKERS)
-  all_news = fetch_google_news(TICKERS + TRACKING_TICKERS)
+  # Pasamos como tuplas para que funcione correctamente la caché de Streamlit (@st.cache_data)
+  df_main = get_comprehensive_market_data(tuple(st.session_state.tickers))
+  df_track = get_comprehensive_market_data(tuple(st.session_state.tracking_tickers))
+  all_news = fetch_google_news(tuple(list(st.session_state.tickers) + list(st.session_state.tracking_tickers)))
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     '🚀 Cartera Principal',
@@ -405,7 +443,7 @@ with tab5:
 
 with tab6:
   st.subheader('📉 Evolución Gráfica Avanzada (Últimos 3 Meses)')
-  all_available_tickers = TICKERS + TRACKING_TICKERS
+  all_available_tickers = list(st.session_state.tickers) + list(st.session_state.tracking_tickers)
   selected_ticker = st.selectbox('Selecciona el activo para ver el gráfico de precios:', all_available_tickers)
 
   if selected_ticker:
