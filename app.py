@@ -46,10 +46,8 @@ def check_password():
     if st.session_state.get("password_correct", False):
         return True
 
-    # Dar un ciclo de carga para que el componente lea la cookie del navegador
-    if "cookie_checked" not in st.session_state:
-        st.session_state["cookie_checked"] = True
-        st.rer() if hasattr(st, "rer") else st.rerun()
+    if cookie_manager.get_all() is None:
+        st.stop()
 
     saved_cookie = cookie_manager.get(cookie="auth_token")
     if saved_cookie == cookie_token:
@@ -70,6 +68,7 @@ def check_password():
         if "password_correct" in st.session_state and not st.session_state["password_correct"]:
             st.error("😕 Contraseña incorrecta")
         return False
+    
     return True
 
 if not check_password():
@@ -101,7 +100,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Configuración de GitHub
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
 GITHUB_REPO = "javierconesa-netizen/acciones-bot"
 FILE_PATH = "portfolio_data.json"
@@ -149,7 +147,6 @@ def save_to_github():
         
     requests.put(url, headers=headers, json=payload)
 
-# Inicializar estado cargando desde GitHub o usando valores por defecto
 cloud_tickers, cloud_names, cloud_positions = load_from_github()
 
 if 'tickers' not in st.session_state:
