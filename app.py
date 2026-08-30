@@ -90,7 +90,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Inicializar listas en st.session_state
+# Inicializar listas y posiciones en st.session_state
 if 'tickers' not in st.session_state:
     st.session_state.tickers = [
         'KO', 'NFLX', 'MC.PA', 'NOV.DE', 'ACHR', 'TSM', 'OPEN', 
@@ -100,6 +100,10 @@ if 'tickers' not in st.session_state:
 
 if 'tracking_tickers' not in st.session_state:
     st.session_state.tracking_tickers = ['GOSS', 'BSIN']
+
+if 'portfolio_positions' not in st.session_state:
+    # Estructura: { 'TICKER': {'shares': cantidad, 'buy_price': precio} }
+    st.session_state.portfolio_positions = {}
 
 NAMES = {
     'KO': 'Coca-Cola',
@@ -138,7 +142,6 @@ def get_comprehensive_market_data(tickers_tuple):
       return pd.DataFrame()
   
   data = []
-  # Descarga optimizada en lote para mejorar el rendimiento
   try:
       hist_data = yf.download(list(tickers_tuple), period='3mo', progress=False, group_by='ticker')
   except Exception:
@@ -326,25 +329,69 @@ with tab1:
                   if len(st.session_state.tickers) > 1:
                       if st.button('🗑️', key=f'pop_del_m_{t}'):
                           st.session_state.tickers.remove(t)
+                          if t in st.session_state.portfolio_positions:
+                              del st.session_state.portfolio_positions[t]
                           st.rerun()
                   else:
                       st.text('Mín 1')
 
+  # Desplegable para configurar acciones y precio de compra de cada activo
+  with st.expander("💼 Configurar mis posiciones (Acciones y Precio de Compra)"):
+      st.markdown("Introduce tus datos por activo para calcular plusvalías/minusvalías reales:")
+      for t in st.session_state.tickers:
+          c_p1, c_p2, c_p3 = st.columns([2, 2, 2])
+          with c_p1:
+              st.markdown(f"**{NAMES.get(t, t)} ({t})**")
+          
+          current_pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
+          with c_p2:
+              sh = st.number_input(f"Acciones {t}", value=float(current_pos.get('shares', 0.0)), min_value=0.0, step=1.0, key=f"shares_{t}")
+          with c_p3:
+              bp = st.number_input(f"Precio Compra {t}", value=float(current_pos.get('buy_price', 0.0)), min_value=0.0, step=0.01, key=f"buy_price_{t}")
+          
+          st.session_state.portfolio_positions[t] = {'shares': sh, 'buy_price': bp}
+
   if not df_main.empty:
     df_main_sorted = df_main.sort_values(by='Cambio (%)', ascending=False)
     
-    col1, col2, col3 = st.columns(3)
-    best_asset = df_main_sorted.iloc[0]
-    worst_asset = df_main_sorted.iloc[-1]
-    
-    with col1:
-        st.markdown(f'<div class="metric-card"><h4>📊 Activos Totales</h4><h2>{len(df_main)}</h2></div>', unsafe_allow_html=True)
-    with col2:
-        st.markdown(f'<div class="metric-card"><h4>🚀 Mayor Subida</h4><h2>{best_asset["Nombre"]} <span style="color: #238636; font-size: 18px;">({best_asset["Cambio (%)"]:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
-    with col3:
-        st.markdown(f'<div class="metric-card"><h4>🔻 Mayor Bajada</h4><h2>{worst_asset["Nombre"]} <span style="color: #da3633; font-size: 18px;">({worst_asset["Cambio (%)"]:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
+    # Calcular métricas globales de cartera si hay posiciones configuradas
+    total_invested = 0.0
+    total_current_value = 0.0
+    has_positions = False
 
-    # Botón de exportación a CSV profesional
+    for _, row in df_main_sorted.iterrows():
+        t = row['Ticker']
+        if t in st.session_state.portfolio_positions:
+            pos = st.session_state.portfolio_positions[t]
+            sh = pos.get('shares', 0.0)
+            bp = pos.get('buy_price', 0.0)
+            if sh > 0 and bp > 0:
+                has_positions = True
+                total_invested += sh * bp
+                total_current_value += sh * row['Precio']
+
+    col1, col2, col3 = st.columns(3)
+    if has_positions:
+        total_pl = total_current_value - total_invested
+        total_pl_pct = (total_pl / total_invested) * 100 if total_invested > 0 else 0.0
+        pl_color = "#238636" if total_pl >= 0 else "#da3633"
+        
+        with col1:
+            st.markdown(f'<div class="metric-card"><h4>💰 Inversión Total</h4><h2>${total_invested:,.2f}</h2></div>', unsafe_allow_html=True)
+        with col2:
+            st.markdown(f'<div class="metric-card"><h4>📈 Valor Actual</h4><h2>${total_current_value:,.2f}</h2></div>', unsafe_allow_html=True)
+        with col3:
+            st.markdown(f'<div class="metric-card"><h4>⚖️ Plusvalía Global</h4><h2><span style="color: {pl_color};">${total_pl:+,.2f} ({total_pl_pct:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
+    else:
+        best_asset = df_main_sorted.iloc[0]
+        worst_asset = df_main_sorted.iloc[-1]
+        with col1:
+            st.markdown(f'<div class="metric-card"><h4>📊 Activos Totales</h4><h2>{len(df_main)}</h2></div>', unsafe_allow_html=True)
+        with col2:
+            st.markdown(f'<div class="metric-card"><h4>🚀 Mayor Subida</h4><h2>{best_asset["Nombre"]} <span style="color: #238636; font-size: 18px;">({best_asset["Cambio (%)"]:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
+        with col3:
+            st.markdown(f'<div class="metric-card"><h4>🔻 Mayor Bajada</h4><h2>{worst_asset["Nombre"]} <span style="color: #da3633; font-size: 18px;">({worst_asset["Cambio (%)"]:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
+
     csv_main = df_main_sorted.to_csv(index=False).encode('utf-8')
     st.download_button(
         label="📥 Descargar Cartera Principal (CSV)",
@@ -358,12 +405,29 @@ with tab1:
         color_change = "#238636" if row['Cambio (%)'] >= 0 else "#da3633"
         sign = "+" if row['Cambio (%)'] >= 0 else ""
         
+        # Calcular beneficio individual si existe posición
+        pos_info = ""
+        t = row['Ticker']
+        if t in st.session_state.portfolio_positions:
+            pos = st.session_state.portfolio_positions[t]
+            sh = pos.get('shares', 0.0)
+            bp = pos.get('buy_price', 0.0)
+            if sh > 0 and bp > 0:
+                cur_val = sh * row['Precio']
+                inv_val = sh * bp
+                diff = cur_val - inv_val
+                diff_pct = (diff / inv_val) * 100
+                p_color = "#238636" if diff >= 0 else "#da3633"
+                p_sign = "+" if diff >= 0 else ""
+                pos_info = f"<br><span style='color: {p_color}; font-size: 11px;'>💼 Posición: {sh} acc. @ {row['Moneda']}{bp:.2f} | P&L: {p_sign}{row['Moneda']}{diff:.2f} ({p_sign}{diff_pct:.2f}%)</span>"
+
         c1, c2 = st.columns([1.5, 1.5])
         with c1:
             st.markdown(f"""
                 <div style="line-height: 1.3;">
                     <span style="font-size: 15px; font-weight: bold; color: #f0f6fc;">{row['Nombre']}</span><br>
                     <span style="color: #8b949e; font-size: 12px;">🕒 {datetime.now().strftime("%d/%m")} | {row['Ticker']}</span>
+                    {pos_info}
                 </div>
             """, unsafe_allow_html=True)
         with c2:
