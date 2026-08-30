@@ -267,7 +267,7 @@ def fetch_google_news(tickers_tuple):
             print(f'Error buscando noticias de {ticker}: {e}')
     return news_items
 
-st.title('💎 Terminal de Inversión y Seguimiento Financiero')
+st.title('💎 Inversión y Seguimiento Financiero')
 st.markdown(f'<p style="color: #8b949e; font-size: 15px;">🚀 Sincronización en tiempo real — Actualizado a fecha: {datetime.now().strftime("%d/%m/%Y %H:%M")}</p>', unsafe_allow_html=True)
 
 with st.spinner('Actualizando mercados y descargando perfiles corporativos...'):
@@ -275,19 +275,43 @@ with st.spinner('Actualizando mercados y descargando perfiles corporativos...'):
   df_track = get_comprehensive_market_data(tuple(st.session_state.tracking_tickers))
   all_news = fetch_google_news(tuple(list(st.session_state.tickers) + list(st.session_state.tracking_tickers)))
 
-# Se añade una nueva pestaña al final para gestionar desde la pantalla de forma cómoda
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+# 6 pestañas principales (sin pestaña extra, el gestor va integrado con un popover junto al título)
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     '🚀 Principal',
     '🔍 Seguimiento',
     '📈 RSI',
     '💰 Dividendos',
     '📰 Noticias',
-    '📉 Gráficos',
-    '⚙️ Gestionar Tickers'
+    '📉 Gráficos'
 ])
 
 with tab1:
-  st.subheader('🚀 Cartera Principal')
+  col_h, col_b = st.columns([3, 1])
+  with col_h:
+      st.subheader('🚀 Cartera Principal')
+  with col_b:
+      with st.popover("⚙️ Gestionar"):
+          st.markdown("### Principal")
+          new_m = st.text_input('Añadir ticker (ej: AAPL):', key='pop_new_main')
+          if st.button('➕ Añadir', key='pop_btn_main'):
+              clean_m = new_m.strip().upper()
+              if clean_m and clean_m not in st.session_state.tickers:
+                  st.session_state.tickers.append(clean_m)
+                  st.success(f'¡{clean_m} añadido!')
+                  st.rerun()
+          st.markdown('**Activos actuales:**')
+          for t in list(st.session_state.tickers):
+              cc1, cc2 = st.columns([3, 1])
+              with cc1:
+                  st.text(t)
+              with cc2:
+                  if len(st.session_state.tickers) > 1:
+                      if st.button('🗑️', key=f'pop_del_m_{t}'):
+                          st.session_state.tickers.remove(t)
+                          st.rerun()
+                  else:
+                      st.text('Mín 1')
+
   if not df_main.empty:
     df_main_sorted = df_main.sort_values(by='Cambio (%)', ascending=False)
     
@@ -326,7 +350,29 @@ with tab1:
         st.markdown("<hr style='margin: 8px 0px; border-color: #21262d;'>", unsafe_allow_html=True)
 
 with tab2:
-  st.subheader('🔍 Cartera de Seguimiento (Radar)')
+  col_h, col_b = st.columns([3, 1])
+  with col_h:
+      st.subheader('🔍 Cartera de Seguimiento')
+  with col_b:
+      with st.popover("⚙️ Gestionar"):
+          st.markdown("### Seguimiento")
+          new_t = st.text_input('Añadir ticker (ej: TSLA):', key='pop_new_track')
+          if st.button('➕ Añadir', key='pop_btn_track'):
+              clean_t = new_t.strip().upper()
+              if clean_t and clean_t not in st.session_state.tracking_tickers:
+                  st.session_state.tracking_tickers.append(clean_t)
+                  st.success(f'¡{clean_t} añadido!')
+                  st.rerun()
+          st.markdown('**Activos actuales:**')
+          for t in list(st.session_state.tracking_tickers):
+              cc1, cc2 = st.columns([3, 1])
+              with cc1:
+                  st.text(t)
+              with cc2:
+                  if st.button('🗑️', key=f'pop_del_t_{t}'):
+                      st.session_state.tracking_tickers.remove(t)
+                      st.rerun()
+
   if not df_track.empty:
     df_track_sorted = df_track.sort_values(by='Cambio (%)', ascending=False)
     for index, row in df_track_sorted.iterrows():
@@ -421,51 +467,3 @@ with tab6:
       st.line_chart(hist_data, color="#238636")
     except Exception as e:
       st.error(f'No se pudo cargar el gráfico para {selected_ticker}: {e}')
-
-with tab7:
-    st.subheader('⚙️ Gestión de Tickers (Añadir y Quitar)')
-    
-    col_m, col_t = st.columns(2)
-    
-    with col_m:
-        st.markdown('### 🚀 Cartera Principal')
-        new_m = st.text_input('Añadir ticker a Principal (ej: AAPL):', key='input_new_main')
-        if st.button('➕ Añadir a Principal', key='btn_add_main'):
-            clean_m = new_m.strip().upper()
-            if clean_m and clean_m not in st.session_state.tickers:
-                st.session_state.tickers.append(clean_m)
-                st.success(f'¡{clean_m} añadido con éxito!')
-                st.rerun()
-        
-        st.markdown('**Activos actuales en Principal:**')
-        for t in list(st.session_state.tickers):
-            c_del1, c_del2 = st.columns([3, 1])
-            with c_del1:
-                st.text(f'• {t} ({NAMES.get(t, "Personalizado")})')
-            with c_del2:
-                if len(st.session_state.tickers) > 1:
-                    if st.button('🗑️', key=f'del_m_{t}'):
-                        st.session_state.tickers.remove(t)
-                        st.rerun()
-                else:
-                    st.text('Mín 1')
-                    
-    with col_t:
-        st.markdown('### 🔍 Cartera de Seguimiento')
-        new_t = st.text_input('Añadir ticker a Seguimiento (ej: TSLA):', key='input_new_track')
-        if st.button('➕ Añadir a Seguimiento', key='btn_add_track'):
-            clean_t = new_t.strip().upper()
-            if clean_t and clean_t not in st.session_state.tracking_tickers:
-                st.session_state.tracking_tickers.append(clean_t)
-                st.success(f'¡{clean_t} añadido con éxito!')
-                st.rerun()
-                
-        st.markdown('**Activos actuales en Seguimiento:**')
-        for t in list(st.session_state.tracking_tickers):
-            c_del1, c_del2 = st.columns([3, 1])
-            with c_del1:
-                st.text(f'• {t} ({NAMES.get(t, "Personalizado")})')
-            with c_del2:
-                if st.button('🗑️', key=f'del_t_{t}'):
-                    st.session_state.tracking_tickers.remove(t)
-                    st.rerun()
