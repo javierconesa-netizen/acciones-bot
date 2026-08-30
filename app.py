@@ -1,7 +1,6 @@
 import sys
 import os
-import xml.etree.ElementTree as ET
-import requests
+import textwrap
 from datetime import datetime
 import pandas as pd
 import streamlit as st
@@ -336,7 +335,7 @@ if not df_main.empty:
             p_sign = "+" if diff >= 0 else ""
             pos_html = f'<div style="background: rgba(19, 27, 46, 0.8); border-left: 3px solid {p_color}; margin-top: 8px; padding: 6px 8px; border-radius: 4px; font-size: 11px; display: flex; justify-content: space-between; align-items: center;"><span>💼 {sh:g} acc.</span><span style="color: {p_color}; font-weight: bold;">{p_sign}{row["Moneda"]}{diff:,.2f} ({p_sign}{diff_pct:.1f}%)</span></div>'
 
-        card_html = f'''
+        card_html = textwrap.dedent(f'''
         <div style="background: linear-gradient(145deg, #131b2e 0%, #090d16 100%); border: 1px solid #21262d; border-radius: 14px; padding: 14px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                 <div>
@@ -359,7 +358,7 @@ if not df_main.empty:
             </div>
             {hist_badge}
             {pos_html}
-        </div>'''
+        </div>''').strip()
 
         st.markdown(card_html, unsafe_allow_html=True)
 
