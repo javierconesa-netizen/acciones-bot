@@ -113,6 +113,10 @@
         "MU": {
             "shares": 0.0,
             "buy_price": 0.0
+        },
+        "APPL": {
+            "shares": 0.0,
+            "buy_price": 0.0
         }
     }
 }
