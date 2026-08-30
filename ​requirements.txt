@@ -1,7 +1,5 @@
 streamlit
 pandas
 requests
-multitasking
-beautifulsoup4
 yfinance
 
