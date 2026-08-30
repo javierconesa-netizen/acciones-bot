@@ -3,7 +3,7 @@ import os
 import base64
 import requests
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 import pandas as pd
 import streamlit as st
 
@@ -23,41 +23,27 @@ except ImportError:
     ])
     import yfinance as yf
 
-try:
-    import extra_streamlit_components as stx
-except ImportError:
-    import subprocess
-    subprocess.check_call([
-        sys.executable, "-m", "pip", "install", 
-        "extra-streamlit-components", "--target", packages_dir
-    ])
-    import extra_streamlit_components as stx
-
 st.set_page_config(
     page_title='Mi Cartera', page_icon='💎', layout='wide'
 )
 
-cookie_manager = stx.CookieManager()
-
 def check_password():
     correct_password = st.secrets.get("PASSWORD", "1234")
-    cookie_token = base64.b64encode(correct_password.encode()).decode()
+    token = base64.b64encode(correct_password.encode()).decode()
     
     if st.session_state.get("password_correct", False):
         return True
 
-    if cookie_manager.get_all() is None:
-        st.stop()
-
-    saved_cookie = cookie_manager.get(cookie="auth_token")
-    if saved_cookie == cookie_token:
+    # Comprobar si el token viene guardado en la URL
+    url_token = st.query_params.get("auth", "")
+    if url_token == token:
         st.session_state["password_correct"] = True
         return True
 
     def password_entered():
         if st.session_state["password"] == correct_password:
             st.session_state["password_correct"] = True
-            cookie_manager.set("auth_token", cookie_token, expires_at=datetime.now() + timedelta(days=30))
+            st.query_params["auth"] = token  # Guarda el token en la URL de forma persistente
             del st.session_state["password"]
         else:
             st.session_state["password_correct"] = False
