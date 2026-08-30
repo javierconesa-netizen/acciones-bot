@@ -62,25 +62,26 @@ if 'tickers' not in st.session_state:
 if 'portfolio_positions' not in st.session_state:
     st.session_state.portfolio_positions = {}
 
-NAMES = {
-    'KO': 'Coca-Cola',
-    'MC.PA': 'LVMH',
-    'BTC-USD': 'Bitcoin',
-    'NOV.DE': 'Novo Nordisk',
-    'OPEN': 'Opendoor Technologies',
-    'NFLX': 'Netflix',
-    'NVDA': 'NVIDIA',
-    'TSM': 'TSMC',
-    'GOOGL': 'Alphabet (Google)',
-    'ACHR': 'Archer Aviation',
-    'IREN': 'Iris Energy',
-    'ASTS': 'AST SpaceMobile',
-    'ONDS': 'Ondas Holdings',
-    'RKLB': 'Rocket Lab',
-    'SLNH': 'Silver Mining',
-    'RZLV': 'Rezolve AI',
-    'LAES': 'Sealsq / LAES'
-}
+if 'custom_names' not in st.session_state:
+    st.session_state.custom_names = {
+        'KO': 'Coca-Cola',
+        'MC.PA': 'LVMH',
+        'BTC-USD': 'Bitcoin',
+        'NOV.DE': 'Novo Nordisk',
+        'OPEN': 'Opendoor Technologies',
+        'NFLX': 'Netflix',
+        'NVDA': 'NVIDIA',
+        'TSM': 'TSMC',
+        'GOOGL': 'Alphabet (Google)',
+        'ACHR': 'Archer Aviation',
+        'IREN': 'Iris Energy',
+        'ASTS': 'AST SpaceMobile',
+        'ONDS': 'Ondas Holdings',
+        'RKLB': 'Rocket Lab',
+        'SLNH': 'Soluna Holdings',
+        'RZLV': 'Rezolve AI',
+        'LAES': 'Sealsq / LAES'
+    }
 
 FALLBACK_DIVIDENDS = {
     'KO': {'div_rate': 1.94, 'yield_pct': 3.10, 'ex_date': '15/09/2026'},
@@ -98,22 +99,22 @@ def get_comprehensive_market_data_extended(tickers_tuple):
     
     data = []
     try:
-        hist_data = yf.download(list(tickers_tuple), period='2y', progress=False, group_by='ticker')
+        hist_data = yf.download(list(tickers_tuple), period='1y', progress=False, group_by='ticker')
     except Exception:
         hist_data = None
 
     for ticker in tickers_tuple:
-        search_term = NAMES.get(ticker, ticker)
+        search_term = st.session_state.custom_names.get(ticker, ticker)
         try:
             if hist_data is not None and len(tickers_tuple) > 1:
                 try:
                     hist = hist_data[ticker].dropna(subset=['Close'])
                 except Exception:
                     stock = yf.Ticker(ticker)
-                    hist = stock.history(period='2y')
+                    hist = stock.history(period='1y')
             else:
                 stock = yf.Ticker(ticker)
-                hist = stock.history(period='2y')
+                hist = stock.history(period='1y')
 
             if len(hist) >= 2:
                 today_data = hist.iloc[-1]
@@ -121,7 +122,6 @@ def get_comprehensive_market_data_extended(tickers_tuple):
 
                 close_today = float(today_data['Close'])
                 close_prev = float(prev_data['Close'])
-                vol_today = float(today_data['Volume'])
 
                 price_change_abs = close_today - close_prev
                 price_change_pct = (price_change_abs / close_prev) * 100
@@ -175,24 +175,34 @@ with col_h:
 with col_b:
     with st.popover("⚙️ Gestionar Activos"):
         st.markdown("### Tickers")
-        new_m = st.text_input('Añadir ticker (ej: AAPL):', key='pop_new_main')
+        new_m = st.text_input('Añadir ticker (ej: AAPL, SLNH):', key='pop_new_main')
         if st.button('➕ Añadir', key='pop_btn_main'):
             clean_m = new_m.strip().upper()
             if clean_m and clean_m not in st.session_state.tickers:
-                st.session_state.tickers.append(clean_m)
-                st.success(f'¡{clean_m} añadido!')
-                st.rerun()
+                with st.spinner(f"Consultando información de {clean_m}..."):
+                    try:
+                        tk_info = yf.Ticker(clean_m).info
+                        fetched_name = tk_info.get('longName') or tk_info.get('shortName') or clean_m
+                    except Exception:
+                        fetched_name = clean_m
+                    
+                    st.session_state.tickers.append(clean_m)
+                    st.session_state.custom_names[clean_m] = fetched_name
+                    st.success(f'¡{fetched_name} ({clean_m}) añadido!')
+                    st.rerun()
         st.markdown('**Activos actuales:**')
         for t in list(st.session_state.tickers):
             cc1, cc2 = st.columns([3, 1])
             with cc1:
-                st.text(t)
+                st.text(f"{st.session_state.custom_names.get(t, t)} ({t})")
             with cc2:
                 if len(st.session_state.tickers) > 1:
                     if st.button('🗑️', key=f'pop_del_m_{t}'):
                         st.session_state.tickers.remove(t)
                         if t in st.session_state.portfolio_positions:
                             del st.session_state.portfolio_positions[t]
+                        if t in st.session_state.custom_names:
+                            del st.session_state.custom_names[t]
                         st.rerun()
                 else:
                     st.text('Mín 1')
@@ -201,8 +211,9 @@ with st.expander("💼 Configurar mis posiciones (Acciones y Precio de Compra)")
     st.markdown("Introduce tus datos por activo para calcular plusvalías/minusvalías reales:")
     for t in st.session_state.tickers:
         c_p1, c_p2, c_p3 = st.columns([2, 2, 2])
+        asset_display_name = st.session_state.custom_names.get(t, t)
         with c_p1:
-            st.markdown(f"**{NAMES.get(t, t)} ({t})**")
+            st.markdown(f"**{asset_display_name} ({t})**")
         
         current_pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
         with c_p2:
