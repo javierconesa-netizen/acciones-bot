@@ -49,46 +49,15 @@ st.markdown("""
         color: #f0f6fc;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        background-color: #161b22;
-        border-radius: 8px 8px 0px 0px;
-        color: #8b949e;
-        padding: 10px 15px;
-        font-weight: 600;
-        border: 1px solid #30363d;
-        font-size: 13px;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #238636 !important;
-        color: white !important;
-        border-color: #2ea043 !important;
-    }
-    .news-card {
-        background-color: #161b22;
-        border-left: 4px solid #238636;
-        padding: 15px;
-        border-radius: 0 8px 8px 0;
-        margin-bottom: 12px;
-        border-top: 1px solid #30363d;
-        border-right: 1px solid #30363d;
-        border-bottom: 1px solid #30363d;
-    }
     </style>
 """, unsafe_allow_html=True)
 
-# Inicializar listas y posiciones en st.session_state
 if 'tickers' not in st.session_state:
     st.session_state.tickers = [
         'KO', 'NFLX', 'MC.PA', 'NOV.DE', 'ACHR', 'TSM', 'OPEN', 
         'NVDA', 'IREN', 'ASTS', 'ONDS', 'RKLB', 'GOOGL', 'SLNH', 
         'RZLV', 'LAES', 'BTC-USD'
     ]
-
-if 'tracking_tickers' not in st.session_state:
-    st.session_state.tracking_tickers = ['GOSS', 'BSIN']
 
 if 'portfolio_positions' not in st.session_state:
     st.session_state.portfolio_positions = {}
@@ -110,9 +79,7 @@ NAMES = {
     'RKLB': 'Rocket Lab',
     'SLNH': 'Silver Mining',
     'RZLV': 'Rezolve AI',
-    'LAES': 'Sealsq / LAES',
-    'GOSS': 'Gossamer Bio',
-    'BSIN': 'Black Spade Acquisition'
+    'LAES': 'Sealsq / LAES'
 }
 
 FALLBACK_DIVIDENDS = {
@@ -155,45 +122,23 @@ def get_comprehensive_market_data_extended(tickers_tuple):
                 close_today = float(today_data['Close'])
                 close_prev = float(prev_data['Close'])
                 vol_today = float(today_data['Volume'])
-                avg_volume = float(hist['Volume'][:-1].mean()) if len(hist) > 1 else vol_today
 
                 price_change_abs = close_today - close_prev
                 price_change_pct = (price_change_abs / close_prev) * 100
                 currency = '€' if ticker in ['MC.PA', 'NOV.DE'] else '$'
-                vol_ratio = (vol_today / avg_volume) * 100 if avg_volume > 0 else 0.0
 
-                # RSI calculation
-                delta = hist['Close'].diff()
-                gain = delta.where(delta > 0, 0.0)
-                loss = -delta.where(delta < 0, 0.0)
-                avg_gain = gain.rolling(window=14).mean()
-                avg_loss = loss.rolling(window=14).mean()
-                rs = avg_gain / avg_loss
-                rsi = 100 - (100 / (1 + rs))
-                current_rsi = float(rsi.iloc[-1]) if not rsi.empty else 50.0
-
-                rsi_label = 'Normal'
-                if current_rsi > 70:
-                    rsi_label = '🔴 Sobrecompra (>70)'
-                elif current_rsi < 30:
-                    rsi_label = '🟢 Sobreventa (<30)'
-                else:
-                    rsi_label = '⚪ Neutral'
-
-                # Historical performance metrics
                 def get_perf(days_offset):
                     if len(hist) > days_offset:
                         past_price = float(hist['Close'].iloc[-days_offset])
                         return ((close_today - past_price) / past_price) * 100
                     return 0.0
 
-                perf_1m = get_perf(21)   # ~1 mes
-                perf_3m = get_perf(63)   # ~3 meses
-                perf_6m = get_perf(126)  # ~6 meses
-                perf_1y = get_perf(252)  # ~1 año
-                perf_2y = get_perf(504)  # ~2 años
+                perf_1m = get_perf(21)
+                perf_3m = get_perf(63)
+                perf_6m = get_perf(126)
+                perf_1y = get_perf(252)
+                perf_2y = get_perf(504)
 
-                # YTD (Año en curso)
                 current_year = datetime.now().year
                 hist_ytd = hist[hist.index.year == current_year]
                 if not hist_ytd.empty:
@@ -202,45 +147,6 @@ def get_comprehensive_market_data_extended(tickers_tuple):
                 else:
                     perf_ytd = 0.0
 
-                # Dividends & Earnings
-                div_rate = 0.0
-                yield_pct = 0.0
-                ex_date_str = 'Próximamente'
-                if ticker in FALLBACK_DIVIDENDS:
-                    fb = FALLBACK_DIVIDENDS[ticker]
-                    div_rate = fb['div_rate']
-                    yield_pct = fb['yield_pct']
-                    ex_date_str = fb['ex_date']
-                else:
-                    try:
-                        stock_div = yf.Ticker(ticker)
-                        divs = stock_div.dividends
-                        if divs is not None and not divs.empty:
-                            if divs.index.tz is not None:
-                                divs.index = divs.index.tz_localize(None)
-                            one_year_ago = datetime.utcnow() - pd.DateOffset(years=1)
-                            recent_divs = divs[divs.index >= one_year_ago]
-                            div_rate = float(recent_divs.sum())
-                            if div_rate > 0:
-                                yield_pct = (div_rate / close_today) * 100 if close_today > 0 else 0.0
-                                ex_date_str = divs.index[-1].strftime('%d/%m/%Y')
-                    except Exception:
-                        pass
-
-                edate_str = 'No programada'
-                try:
-                    stock_cal = yf.Ticker(ticker)
-                    cal = stock_cal.calendar
-                    if cal is not None:
-                        if isinstance(cal, dict) and 'Earnings Date' in cal:
-                            edates = cal['Earnings Date']
-                            if edates:
-                                edate_str = str(edates[0])[:10]
-                        elif hasattr(cal, 'loc') and 'Earnings Date' in cal.index:
-                            edate_str = str(cal.loc['Earnings Date'].values[0])[:10]
-                except Exception:
-                    pass
-
                 data.append({
                     'Ticker': ticker,
                     'Nombre': search_term,
@@ -248,14 +154,6 @@ def get_comprehensive_market_data_extended(tickers_tuple):
                     'Moneda': currency,
                     'Cambio (%)': price_change_pct,
                     'Cambio Abs': price_change_abs,
-                    'Volumen Hoy': vol_today,
-                    'Volumen vs Media (%)': vol_ratio,
-                    'RSI': current_rsi,
-                    'RSI_Label': rsi_label,
-                    'Div_Rate': div_rate,
-                    'Yield_Pct': yield_pct,
-                    'Ex_Date': ex_date_str,
-                    'Earnings': edate_str,
                     'Perf_1M': perf_1m,
                     'Perf_3M': perf_3m,
                     'Perf_6M': perf_6m,
@@ -267,344 +165,186 @@ def get_comprehensive_market_data_extended(tickers_tuple):
             print(f'Error procesando {ticker}: {e}')
     return pd.DataFrame(data)
 
-@st.cache_data(ttl=600)
-def fetch_google_news(tickers_tuple):
-    forbidden_words = [
-        'tenis', 'alcaraz', 'williams', 'us open', 'partido', 'torneo',
-        'enfrentamiento', 'deporte', 'fútbol', 'boxeo', 'muay thai',
-        'combate', 'ufc', 'mma', 'ejercicios', 'entrenamiento', 'método ko',
-    ]
-    news_items = []
-    for ticker in tickers_tuple:
-        search_term = NAMES.get(ticker, ticker)
-        try:
-            url = f'https://news.google.com/rss/search?q={search_term}&hl=es&gl=ES&ceid=ES:es'
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                root = ET.fromstring(response.content)
-                items = root.findall('.//item')[:2]
-                for item in items:
-                    title_elem = item.find('title')
-                    link_elem = item.find('link')
-                    pub_date_elem = item.find('pubDate')
-                    if title_elem is not None and link_elem is not None:
-                        title = title_elem.text
-                        link = link_elem.text
-                        pub_date = pub_date_elem.text if pub_date_elem is not None else ''
-
-                        title_lower = title.lower()
-                        if any(fw in title_lower for fw in forbidden_words):
-                            continue
-
-                        news_items.append({
-                            'Ticker': ticker,
-                            'Activo': search_term,
-                            'Titulo': title,
-                            'Enlace': link,
-                            'Fecha': pub_date
-                        })
-        except Exception as e:
-            print(f'Error buscando noticias de {ticker}: {e}')
-    return news_items
-
-st.title('💎 Inversión y Seguimiento Financiero')
+st.title('💎 Mi Cartera de Inversión')
 st.markdown(f'<p style="color: #8b949e; font-size: 15px;">🚀 Sincronización en tiempo real — Actualizado a fecha: {datetime.now().strftime("%d/%m/%Y %H:%M")}</p>', unsafe_allow_html=True)
 
-with st.spinner('Actualizando mercados y descargando perfiles corporativos...'):
+with st.spinner('Actualizando mercados y posiciones...'):
     df_main = get_comprehensive_market_data_extended(tuple(st.session_state.tickers))
-    df_track = get_comprehensive_market_data_extended(tuple(st.session_state.tracking_tickers))
-    all_news = fetch_google_news(tuple(list(st.session_state.tickers) + list(st.session_state.tracking_tickers)))
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    '🚀 Principal',
-    '🔍 Seguimiento',
-    '📈 RSI',
-    '💰 Dividendos',
-    '📰 Noticias',
-    '📉 Gráficos'
-])
+col_h, col_b = st.columns([3, 1])
+with col_h:
+    st.subheader('🚀 Panel de Control y Posiciones')
+with col_b:
+    with st.popover("⚙️ Gestionar Activos"):
+        st.markdown("### Tickers")
+        new_m = st.text_input('Añadir ticker (ej: AAPL):', key='pop_new_main')
+        if st.button('➕ Añadir', key='pop_btn_main'):
+            clean_m = new_m.strip().upper()
+            if clean_m and clean_m not in st.session_state.tickers:
+                st.session_state.tickers.append(clean_m)
+                st.success(f'¡{clean_m} añadido!')
+                st.rerun()
+        st.markdown('**Activos actuales:**')
+        for t in list(st.session_state.tickers):
+            cc1, cc2 = st.columns([3, 1])
+            with cc1:
+                st.text(t)
+            with cc2:
+                if len(st.session_state.tickers) > 1:
+                    if st.button('🗑️', key=f'pop_del_m_{t}'):
+                        st.session_state.tickers.remove(t)
+                        if t in st.session_state.portfolio_positions:
+                            del st.session_state.portfolio_positions[t]
+                        st.rerun()
+                else:
+                    st.text('Mín 1')
 
-with tab1:
-    col_h, col_b = st.columns([3, 1])
-    with col_h:
-        st.subheader('🚀 Cartera Principal y Posiciones')
-    with col_b:
-        with st.popover("⚙️ Gestionar"):
-            st.markdown("### Principal")
-            new_m = st.text_input('Añadir ticker (ej: AAPL):', key='pop_new_main')
-            if st.button('➕ Añadir', key='pop_btn_main'):
-                clean_m = new_m.strip().upper()
-                if clean_m and clean_m not in st.session_state.tickers:
-                    st.session_state.tickers.append(clean_m)
-                    st.success(f'¡{clean_m} añadido!')
-                    st.rerun()
-            st.markdown('**Activos actuales:**')
-            for t in list(st.session_state.tickers):
-                cc1, cc2 = st.columns([3, 1])
-                with cc1:
-                    st.text(t)
-                with cc2:
-                    if len(st.session_state.tickers) > 1:
-                        if st.button('🗑️', key=f'pop_del_m_{t}'):
-                            st.session_state.tickers.remove(t)
-                            if t in st.session_state.portfolio_positions:
-                                del st.session_state.portfolio_positions[t]
-                            st.rerun()
-                    else:
-                        st.text('Mín 1')
-
-    # Desplegable para configurar acciones y precio de compra de cada activo
-    with st.expander("💼 Configurar mis posiciones (Acciones y Precio de Compra)"):
-        st.markdown("Introduce tus datos por activo para calcular plusvalías/minusvalías reales:")
-        for t in st.session_state.tickers:
-            c_p1, c_p2, c_p3 = st.columns([2, 2, 2])
-            with c_p1:
-                st.markdown(f"**{NAMES.get(t, t)} ({t})**")
-            
-            current_pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
-            with c_p2:
-                sh = st.number_input(f"Acciones {t}", value=float(current_pos.get('shares', 0.0)), min_value=0.0, step=1.0, key=f"shares_{t}")
-            with c_p3:
-                bp = st.number_input(f"Precio Compra {t}", value=float(current_pos.get('buy_price', 0.0)), min_value=0.0, step=0.01, key=f"buy_price_{t}")
-            
-            st.session_state.portfolio_positions[t] = {'shares': sh, 'buy_price': bp}
-
-    if not df_main.empty:
-        # Calcular métricas globales de cartera si hay posiciones configuradas
-        total_invested = 0.0
-        total_current_value = 0.0
-        has_positions = False
-
-        for _, row in df_main.iterrows():
-            t = row['Ticker']
-            if t in st.session_state.portfolio_positions:
-                pos = st.session_state.portfolio_positions[t]
-                sh = pos.get('shares', 0.0)
-                bp = pos.get('buy_price', 0.0)
-                if sh > 0 and bp > 0:
-                    has_positions = True
-                    total_invested += sh * bp
-                    total_current_value += sh * row['Precio']
-
-        col1, col2, col3 = st.columns(3)
-        if has_positions:
-            total_pl = total_current_value - total_invested
-            total_pl_pct = (total_pl / total_invested) * 100 if total_invested > 0 else 0.0
-            pl_color = "#238636" if total_pl >= 0 else "#da3633"
-            
-            with col1:
-                st.markdown(f'<div class="metric-card"><h4>💰 Inversión Total</h4><h2>${total_invested:,.2f}</h2></div>', unsafe_allow_html=True)
-            with col2:
-                st.markdown(f'<div class="metric-card"><h4>📈 Valor Actual</h4><h2>${total_current_value:,.2f}</h2></div>', unsafe_allow_html=True)
-            with col3:
-                st.markdown(f'<div class="metric-card"><h4>⚖️ Plusvalía Global</h4><h2><span style="color: {pl_color};">${total_pl:+,.2f} ({total_pl_pct:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
-        else:
-            best_asset = df_main.sort_values(by='Cambio (%)', ascending=False).iloc[0]
-            worst_asset = df_main.sort_values(by='Cambio (%)', ascending=True).iloc[0]
-            with col1:
-                st.markdown(f'<div class="metric-card"><h4>📊 Activos Totales</h4><h2>{len(df_main)}</h2></div>', unsafe_allow_html=True)
-            with col2:
-                st.markdown(f'<div class="metric-card"><h4>🚀 Mayor Subida</h4><h2>{best_asset["Nombre"]} <span style="color: #238636; font-size: 18px;">({best_asset["Cambio (%)"]:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
-            with col3:
-                st.markdown(f'<div class="metric-card"><h4>🔻 Mayor Bajada</h4><h2>{worst_asset["Nombre"]} <span style="color: #da3633; font-size: 18px;">({worst_asset["Cambio (%)"]:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
-
-        st.markdown('---')
-
-        # Selectores de Temporalidad y Ordenación
-        c_f1, c_f2 = st.columns(2)
-        with c_f1:
-            timeframe_label = st.selectbox(
-                "⏱️ Seleccionar Periodo Histórico", 
-                ['1 Mes', '3 Meses', '6 Meses', '1 Año', '2 Años', 'Año en curso (YTD)'],
-                key='main_tf_select'
-            )
+with st.expander("💼 Configurar mis posiciones (Acciones y Precio de Compra)"):
+    st.markdown("Introduce tus datos por activo para calcular plusvalías/minusvalías reales:")
+    for t in st.session_state.tickers:
+        c_p1, c_p2, c_p3 = st.columns([2, 2, 2])
+        with c_p1:
+            st.markdown(f"**{NAMES.get(t, t)} ({t})**")
         
-        tf_mapping = {
-            '1 Mes': 'Perf_1M',
-            '3 Meses': 'Perf_3M',
-            '6 Meses': 'Perf_6M',
-            '1 Año': 'Perf_1Y',
-            '2 Años': 'Perf_2Y',
-            'Año en curso (YTD)': 'Perf_YTD'
-        }
-        active_perf_col = tf_mapping[timeframe_label]
+        current_pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
+        with c_p2:
+            sh = st.number_input(f"Acciones {t}", value=float(current_pos.get('shares', 0.0)), min_value=0.0, step=1.0, key=f"shares_{t}")
+        with c_p3:
+            bp = st.number_input(f"Precio Compra {t}", value=float(current_pos.get('buy_price', 0.0)), min_value=0.0, step=0.01, key=f"buy_price_{t}")
+        
+        st.session_state.portfolio_positions[t] = {'shares': sh, 'buy_price': bp}
 
-        with c_f2:
-            sort_option = st.selectbox(
-                "🔄 Ordenar Cartera por", 
-                ['Cambio Diario (%) [Mayor a Menor]', 'Cambio Diario (%) [Menor a Mayor]', 
-                 f'Histórico ({timeframe_label}) [Mayor a Menor]', f'Histórico ({timeframe_label}) [Menor a Mayor]',
-                 'P&L Histórico Absoluto (€/$) [Mayor a Menor]'],
-                key='main_sort_select'
-            )
+if not df_main.empty:
+    total_invested = 0.0
+    total_current_value = 0.0
+    has_positions = False
 
-        # Aplicar ordenación
-        if 'Diario (%) [Mayor a Menor]' in sort_option:
-            df_main = df_main.sort_values(by='Cambio (%)', ascending=False)
-        elif 'Diario (%) [Menor a Mayor]' in sort_option:
-            df_main = df_main.sort_values(by='Cambio (%)', ascending=True)
-        elif '[Mayor a Menor]' in sort_option and 'Histórico' in sort_option:
-            df_main = df_main.sort_values(by=active_perf_col, ascending=False)
-        elif '[Menor a Mayor]' in sort_option and 'Histórico' in sort_option:
-            df_main = df_main.sort_values(by=active_perf_col, ascending=True)
-        elif 'P&L Histórico Absoluto' in sort_option:
-            def calc_abs_pl(row):
-                t = row['Ticker']
-                pos = st.session_state.portfolio_positions.get(t, {})
-                sh = pos.get('shares', 0.0)
-                bp = pos.get('buy_price', 0.0)
-                if sh > 0 and bp > 0:
-                    return (row['Precio'] - bp) * sh
-                return 0.0
-            df_main['Temp_P_L'] = df_main.apply(calc_abs_pl, axis=1)
-            df_main = df_main.sort_values(by='Temp_P_L', ascending=False)
-
-        csv_main = df_main.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Descargar Cartera Principal (CSV)",
-            data=csv_main,
-            file_name='cartera_principal.csv',
-            mime='text/csv',
-        )
-        st.markdown('---')
-
-        def render_portfolio_card_grid(row, perf_col, tf_label):
-            color_daily = "#238636" if row['Cambio (%)'] >= 0 else "#da3633"
-            sign_daily = "+" if row['Cambio (%)'] >= 0 else ""
-            
-            hist_val = row[perf_col]
-            color_hist = "#238636" if hist_val >= 0 else "#da3633"
-            sign_hist = "+" if hist_val >= 0 else ""
-
-            t = row['Ticker']
-            pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
+    for _, row in df_main.iterrows():
+        t = row['Ticker']
+        if t in st.session_state.portfolio_positions:
+            pos = st.session_state.portfolio_positions[t]
             sh = pos.get('shares', 0.0)
             bp = pos.get('buy_price', 0.0)
-            
-            pos_html = ""
             if sh > 0 and bp > 0:
-                cur_val = sh * row['Precio']
-                inv_val = sh * bp
-                diff = cur_val - inv_val
-                diff_pct = (diff / inv_val) * 100
-                p_color = "#238636" if diff >= 0 else "#da3633"
-                p_sign = "+" if diff >= 0 else ""
-                pos_html = f'<div style="border-top: 1px solid #30363d; margin-top: 6px; padding-top: 4px; font-size: 11px;">💼 {sh:g} acc. | P&L: <span style="color: {p_color}; font-weight: bold;">{p_sign}{row["Moneda"]}{diff:,.2f} ({p_sign}{diff_pct:.1f}%)</span></div>'
+                has_positions = True
+                total_invested += sh * bp
+                total_current_value += sh * row['Precio']
 
-            card_html = f'<div style="background: #161b22; border: 1px solid #30363d; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><span style="font-size: 13px; font-weight: bold; color: #f0f6fc;">{row["Nombre"]}</span><br><span style="color: #8b949e; font-size: 10px;">{row["Ticker"]}</span><div style="margin-top: 4px;"><span style="font-size: 15px; font-weight: bold; color: #f0f6fc;">{row["Moneda"]}{row["Precio"]:.3f}</span></div><div style="font-size: 11px; margin-top: 6px;"><span>Día: <span style="color: {color_daily}; font-weight: bold;">{sign_daily}{row["Cambio (%)"]:.2f}%</span></span><br><span>{tf_label}: <span style="color: {color_hist}; font-weight: bold;">{sign_hist}{hist_val:.2f}%</span></span></div>{pos_html}</div>'
-
-            st.markdown(card_html, unsafe_allow_html=True)
-
-        # Renderizar en cuadrícula de 2 columnas para optimizar móvil
-        assets_list = list(df_main.iterrows())
-        for i in range(0, len(assets_list), 2):
-            col_a, col_b = st.columns(2)
-            
-            with col_a:
-                if i < len(assets_list):
-                    _, row = assets_list[i]
-                    render_portfolio_card_grid(row, active_perf_col, timeframe_label)
-            with col_b:
-                if i + 1 < len(assets_list):
-                    _, row = assets_list[i + 1]
-                    render_portfolio_card_grid(row, active_perf_col, timeframe_label)
-
-with tab2:
-    col_h, col_b = st.columns([3, 1])
-    with col_h:
-        st.subheader('🔍 Cartera de Seguimiento')
-    with col_b:
-        with st.popover("⚙️ Gestionar"):
-            st.markdown("### Seguimiento")
-            new_t = st.text_input('Añadir ticker (ej: TSLA):', key='pop_new_track')
-            if st.button('➕ Añadir', key='pop_btn_track'):
-                clean_t = new_t.strip().upper()
-                if clean_t and clean_t not in st.session_state.tracking_tickers:
-                    st.session_state.tracking_tickers.append(clean_t)
-                    st.success(f'¡{clean_t} añadido!')
-                    st.rerun()
-            st.markdown('**Activos actuales:**')
-            for t in list(st.session_state.tracking_tickers):
-                cc1, cc2 = st.columns([3, 1])
-                with cc1:
-                    st.text(t)
-                with cc2:
-                    if st.button('🗑️', key=f'pop_del_t_{t}'):
-                        st.session_state.tracking_tickers.remove(t)
-                        st.rerun()
-
-    if not df_track.empty:
-        df_track_sorted = df_track.sort_values(by='Cambio (%)', ascending=False)
-        csv_track = df_track_sorted.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Descargar Seguimiento (CSV)",
-            data=csv_track,
-            file_name='cartera_seguimiento.csv',
-            mime='text/csv',
-        )
-        st.markdown('---')
-
-        for index, row in df_track_sorted.iterrows():
-            color_change = "#238636" if row['Cambio (%)'] >= 0 else "#da3633"
-            sign = "+" if row['Cambio (%)'] >= 0 else ""
-            
-            c1, c2 = st.columns([1.5, 1.5])
-            with c1:
-                st.markdown(f"""
-                    <div style="line-height: 1.3;">
-                        <span style="font-size: 15px; font-weight: bold; color: #f0f6fc;">{row['Nombre']}</span><br>
-                        <span style="color: #8b949e; font-size: 12px;">🕒 {datetime.now().strftime("%d/%m")} | {row['Ticker']}</span>
-                    </div>
-                """, unsafe_allow_html=True)
-            with c2:
-                st.markdown(f"""
-                    <div style="text-align: right; line-height: 1.3;">
-                        <span style="font-size: 16px; font-weight: bold; color: #f0f6fc;">{row['Moneda']}{row['Precio']:.3f}</span><br>
-                        <span style="color: {color_change}; font-size: 13px; font-weight: bold;">{sign}{row['Cambio Abs']:.3f} ({sign}{row['Cambio (%)']:.2f}%)</span>
-                    </div>
-                """, unsafe_allow_html=True)
-            st.markdown("<hr style='margin: 8px 0px; border-color: #21262d;'>", unsafe_allow_html=True)
-
-with tab3:
-    st.subheader('📈 Análisis Técnico (RSI)')
-    st.markdown("Indicador de Fuerza Relativa (RSI 14 días) para identificar posibles sobrecompras o sobreventas.")
-    if not df_main.empty:
-        rsi_df = df_main[['Ticker', 'Nombre', 'Precio', 'Moneda', 'RSI', 'RSI_Label']].sort_values(by='RSI', ascending=False)
-        st.dataframe(rsi_df, use_container_width=True)
-
-with tab4:
-    st.subheader('💰 Dividendos y Próximos Pagos')
-    st.markdown("Estimación anual de dividendos y fechas ex-dividendo de la cartera principal.")
-    if not df_main.empty:
-        div_df = df_main[['Ticker', 'Nombre', 'Div_Rate', 'Yield_Pct', 'Ex_Date']].sort_values(by='Yield_Pct', ascending=False)
-        st.dataframe(div_df, use_container_width=True)
-
-with tab5:
-    st.subheader('📰 Noticias Financieras en Vivo')
-    if all_news:
-        for news in all_news:
-            st.markdown(f"""
-                <div class="news-card">
-                    <span style="color: #58a6ff; font-weight: bold; font-size: 12px;">{news['Activo']} ({news['Ticker']})</span>
-                    <h4 style="margin: 5px 0;"><a href="{news['Enlace']}" target="_blank" style="color: #f0f6fc; text-decoration: none;">{news['Titulo']}</a></h4>
-                    <span style="color: #8b949e; font-size: 11px;">{news['Fecha']}</span>
-                </div>
-            """, unsafe_allow_html=True)
+    col1, col2, col3 = st.columns(3)
+    if has_positions:
+        total_pl = total_current_value - total_invested
+        total_pl_pct = (total_pl / total_invested) * 100 if total_invested > 0 else 0.0
+        pl_color = "#238636" if total_pl >= 0 else "#da3633"
+        
+        with col1:
+            st.markdown(f'<div class="metric-card"><h4>💰 Inversión Total</h4><h2>${total_invested:,.2f}</h2></div>', unsafe_allow_html=True)
+        with col2:
+            st.markdown(f'<div class="metric-card"><h4>📈 Valor Actual</h4><h2>${total_current_value:,.2f}</h2></div>', unsafe_allow_html=True)
+        with col3:
+            st.markdown(f'<div class="metric-card"><h4>⚖️ Plusvalía Global</h4><h2><span style="color: {pl_color};">${total_pl:+,.2f} ({total_pl_pct:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
     else:
-        st.info("No hay noticias recientes disponibles en este momento.")
+        best_asset = df_main.sort_values(by='Cambio (%)', ascending=False).iloc[0]
+        worst_asset = df_main.sort_values(by='Cambio (%)', ascending=True).iloc[0]
+        with col1:
+            st.markdown(f'<div class="metric-card"><h4>📊 Activos Totales</h4><h2>{len(df_main)}</h2></div>', unsafe_allow_html=True)
+        with col2:
+            st.markdown(f'<div class="metric-card"><h4>🚀 Mayor Subida</h4><h2>{best_asset["Nombre"]} <span style="color: #238636; font-size: 18px;">({best_asset["Cambio (%)"]:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
+        with col3:
+            st.markdown(f'<div class="metric-card"><h4>🔻 Mayor Bajada</h4><h2>{worst_asset["Nombre"]} <span style="color: #da3633; font-size: 18px;">({worst_asset["Cambio (%)"]:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
 
-with tab6:
-    st.subheader('📉 Gráficos e Histórico')
-    st.markdown("Selecciona un activo para visualizar su evolución histórica reciente.")
-    all_tickers_list = list(st.session_state.tickers) + list(st.session_state.tracking_tickers)
-    selected_chart_ticker = st.selectbox("Seleccionar activo para gráfico", all_tickers_list)
-    if selected_chart_ticker:
-        try:
-            chart_stock = yf.Ticker(selected_chart_ticker)
-            chart_hist = chart_stock.history(period='1y')
-            if not chart_hist.empty:
-                st.line_chart(chart_hist['Close'])
-            else:
-                st.warning("No hay datos históricos disponibles para este gráfico.")
-        except Exception as e:
-            st.error(f"Error cargando gráfico: {e}")
+    st.markdown('---')
+
+    c_f1, c_f2 = st.columns(2)
+    with c_f1:
+        timeframe_label = st.selectbox(
+            "⏱️ Seleccionar Periodo Histórico", 
+            ['1 Mes', '3 Meses', '6 Meses', '1 Año', '2 Años', 'Año en curso (YTD)'],
+            key='main_tf_select'
+        )
+    
+    tf_mapping = {
+        '1 Mes': 'Perf_1M',
+        '3 Meses': 'Perf_3M',
+        '6 Meses': 'Perf_6M',
+        '1 Año': 'Perf_1Y',
+        '2 Años': 'Perf_2Y',
+        'Año en curso (YTD)': 'Perf_YTD'
+    }
+    active_perf_col = tf_mapping[timeframe_label]
+
+    with c_f2:
+        sort_option = st.selectbox(
+            "🔄 Ordenar Cartera por", 
+            ['Cambio Diario (%) [Mayor a Menor]', 'Cambio Diario (%) [Menor a Mayor]', 
+             f'Histórico ({timeframe_label}) [Mayor a Menor]', f'Histórico ({timeframe_label}) [Menor a Mayor]',
+             'P&L Histórico Absoluto (€/$) [Mayor a Menor]'],
+            key='main_sort_select'
+        )
+
+    if 'Diario (%) [Mayor a Menor]' in sort_option:
+        df_main = df_main.sort_values(by='Cambio (%)', ascending=False)
+    elif 'Diario (%) [Menor a Mayor]' in sort_option:
+        df_main = df_main.sort_values(by='Cambio (%)', ascending=True)
+    elif '[Mayor a Menor]' in sort_option and 'Histórico' in sort_option:
+        df_main = df_main.sort_values(by=active_perf_col, ascending=False)
+    elif '[Menor a Mayor]' in sort_option and 'Histórico' in sort_option:
+        df_main = df_main.sort_values(by=active_perf_col, ascending=True)
+    elif 'P&L Histórico Absoluto' in sort_option:
+        def calc_abs_pl(row):
+            t = row['Ticker']
+            pos = st.session_state.portfolio_positions.get(t, {})
+            sh = pos.get('shares', 0.0)
+            bp = pos.get('buy_price', 0.0)
+            if sh > 0 and bp > 0:
+                return (row['Precio'] - bp) * sh
+            return 0.0
+        df_main['Temp_P_L'] = df_main.apply(calc_abs_pl, axis=1)
+        df_main = df_main.sort_values(by='Temp_P_L', ascending=False)
+
+    csv_main = df_main.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Descargar Cartera Principal (CSV)",
+        data=csv_main,
+        file_name='cartera_principal.csv',
+        mime='text/csv',
+    )
+    st.markdown('---')
+
+    def render_portfolio_card_grid(row, perf_col, tf_label):
+        color_daily = "#238636" if row['Cambio (%)'] >= 0 else "#da3633"
+        sign_daily = "+" if row['Cambio (%)'] >= 0 else ""
+        
+        hist_val = row[perf_col]
+        color_hist = "#238636" if hist_val >= 0 else "#da3633"
+        sign_hist = "+" if hist_val >= 0 else ""
+
+        t = row['Ticker']
+        pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
+        sh = pos.get('shares', 0.0)
+        bp = pos.get('buy_price', 0.0)
+        
+        pos_html = ""
+        if sh > 0 and bp > 0:
+            cur_val = sh * row['Precio']
+            inv_val = sh * bp
+            diff = cur_val - inv_val
+            diff_pct = (diff / inv_val) * 100
+            p_color = "#238636" if diff >= 0 else "#da3633"
+            p_sign = "+" if diff >= 0 else ""
+            pos_html = f'<div style="border-top: 1px solid #30363d; margin-top: 6px; padding-top: 4px; font-size: 11px;">💼 {sh:g} acc. | P&L: <span style="color: {p_color}; font-weight: bold;">{p_sign}{row["Moneda"]}{diff:,.2f} ({p_sign}{diff_pct:.1f}%)</span></div>'
+
+        card_html = f'<div style="background: #161b22; border: 1px solid #30363d; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><span style="font-size: 13px; font-weight: bold; color: #f0f6fc;">{row["Nombre"]}</span><br><span style="color: #8b949e; font-size: 10px;">{row["Ticker"]}</span><div style="margin-top: 4px;"><span style="font-size: 15px; font-weight: bold; color: #f0f6fc;">{row["Moneda"]}{row["Precio"]:.3f}</span></div><div style="font-size: 11px; margin-top: 6px;"><span>Día: <span style="color: {color_daily}; font-weight: bold;">{sign_daily}{row["Cambio (%)"]:.2f}%</span></span><br><span>{tf_label}: <span style="color: {color_hist}; font-weight: bold;">{sign_hist}{hist_val:.2f}%</span></span></div>{pos_html}</div>'
+
+        st.markdown(card_html, unsafe_allow_html=True)
+
+    assets_list = list(df_main.iterrows())
+    for i in range(0, len(assets_list), 2):
+        col_a, col_b = st.columns(2)
+        with col_a:
+            if i < len(assets_list):
+                _, row = assets_list[i]
+                render_portfolio_card_grid(row, active_perf_col, timeframe_label)
+        with col_b:
+            if i + 1 < len(assets_list):
+                _, row = assets_list[i + 1]
+                render_portfolio_card_grid(row, active_perf_col, timeframe_label)
