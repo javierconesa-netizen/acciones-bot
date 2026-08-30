@@ -108,6 +108,10 @@
         "BTC-USD": {
             "shares": 0.021986,
             "buy_price": 70304.5
+        },
+        "AAPL": {
+            "shares": 0.0,
+            "buy_price": 0.0
         }
     }
 }
