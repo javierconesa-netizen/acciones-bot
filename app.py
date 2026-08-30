@@ -56,9 +56,10 @@ st.markdown("""
         background-color: #161b22;
         border-radius: 8px 8px 0px 0px;
         color: #8b949e;
-        padding: 10px 20px;
+        padding: 10px 15px;
         font-weight: 600;
         border: 1px solid #30363d;
+        font-size: 13px;
     }
     .stTabs [aria-selected="true"] {
         background-color: #238636 !important;
@@ -89,7 +90,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Inicializar listas en st.session_state para permitir agregar/quitar dinámicamente
+# Inicializar listas en st.session_state
 if 'tickers' not in st.session_state:
     st.session_state.tickers = [
         'KO', 'NFLX', 'MC.PA', 'NOV.DE', 'ACHR', 'TSM', 'OPEN', 
@@ -130,40 +131,6 @@ FALLBACK_DIVIDENDS = {
     'NVDA': {'div_rate': 0.04, 'yield_pct': 0.03, 'ex_date': '05/09/2026'},
     'GOOGL': {'div_rate': 0.80, 'yield_pct': 0.45, 'ex_date': 'Próximamente'},
 }
-
-# Panel Lateral para Gestión de Tickers
-st.sidebar.header("⚙️ Gestión de Cartera")
-
-st.sidebar.subheader("🚀 Cartera Principal")
-selected_main = st.sidebar.multiselect(
-    "Activos en Principal:",
-    options=st.session_state.tickers,
-    default=st.session_state.tickers
-)
-st.session_state.tickers = selected_main
-
-new_main_ticker = st.sidebar.text_input("Añadir nuevo a Principal (ej: AAPL):")
-if st.sidebar.button("Agregar Principal") and new_main_ticker:
-    clean_ticker = new_main_ticker.strip().upper()
-    if clean_ticker and clean_ticker not in st.session_state.tickers:
-        st.session_state.tickers.append(clean_ticker)
-        st.rerun()
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("🔍 Cartera de Seguimiento")
-selected_tracking = st.sidebar.multiselect(
-    "Activos en Seguimiento:",
-    options=st.session_state.tracking_tickers,
-    default=st.session_state.tracking_tickers
-)
-st.session_state.tracking_tickers = selected_tracking
-
-new_track_ticker = st.sidebar.text_input("Añadir nuevo a Seguimiento (ej: TSLA):")
-if st.sidebar.button("Agregar Seguimiento") and new_track_ticker:
-    clean_track = new_track_ticker.strip().upper()
-    if clean_track and clean_track not in st.session_state.tracking_tickers:
-        st.session_state.tracking_tickers.append(clean_track)
-        st.rerun()
 
 @st.cache_data(ttl=300)
 def get_comprehensive_market_data(tickers_tuple):
@@ -304,18 +271,19 @@ st.title('💎 Terminal de Inversión y Seguimiento Financiero')
 st.markdown(f'<p style="color: #8b949e; font-size: 15px;">🚀 Sincronización en tiempo real — Actualizado a fecha: {datetime.now().strftime("%d/%m/%Y %H:%M")}</p>', unsafe_allow_html=True)
 
 with st.spinner('Actualizando mercados y descargando perfiles corporativos...'):
-  # Pasamos como tuplas para que funcione correctamente la caché de Streamlit (@st.cache_data)
   df_main = get_comprehensive_market_data(tuple(st.session_state.tickers))
   df_track = get_comprehensive_market_data(tuple(st.session_state.tracking_tickers))
   all_news = fetch_google_news(tuple(list(st.session_state.tickers) + list(st.session_state.tracking_tickers)))
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    '🚀 Cartera Principal',
-    '🔍 Cartera Seguimiento',
-    '📈 Análisis Técnico & RSI',
-    '💰 Dividendos & Earnings',
-    '📰 Noticias RSS',
-    '📉 Gráficos Avanzados',
+# Se añade una nueva pestaña al final para gestionar desde la pantalla de forma cómoda
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    '🚀 Principal',
+    '🔍 Seguimiento',
+    '📈 RSI',
+    '💰 Dividendos',
+    '📰 Noticias',
+    '📉 Gráficos',
+    '⚙️ Gestionar Tickers'
 ])
 
 with tab1:
@@ -453,3 +421,51 @@ with tab6:
       st.line_chart(hist_data, color="#238636")
     except Exception as e:
       st.error(f'No se pudo cargar el gráfico para {selected_ticker}: {e}')
+
+with tab7:
+    st.subheader('⚙️ Gestión de Tickers (Añadir y Quitar)')
+    
+    col_m, col_t = st.columns(2)
+    
+    with col_m:
+        st.markdown('### 🚀 Cartera Principal')
+        new_m = st.text_input('Añadir ticker a Principal (ej: AAPL):', key='input_new_main')
+        if st.button('➕ Añadir a Principal', key='btn_add_main'):
+            clean_m = new_m.strip().upper()
+            if clean_m and clean_m not in st.session_state.tickers:
+                st.session_state.tickers.append(clean_m)
+                st.success(f'¡{clean_m} añadido con éxito!')
+                st.rerun()
+        
+        st.markdown('**Activos actuales en Principal:**')
+        for t in list(st.session_state.tickers):
+            c_del1, c_del2 = st.columns([3, 1])
+            with c_del1:
+                st.text(f'• {t} ({NAMES.get(t, "Personalizado")})')
+            with c_del2:
+                if len(st.session_state.tickers) > 1:
+                    if st.button('🗑️', key=f'del_m_{t}'):
+                        st.session_state.tickers.remove(t)
+                        st.rerun()
+                else:
+                    st.text('Mín 1')
+                    
+    with col_t:
+        st.markdown('### 🔍 Cartera de Seguimiento')
+        new_t = st.text_input('Añadir ticker a Seguimiento (ej: TSLA):', key='input_new_track')
+        if st.button('➕ Añadir a Seguimiento', key='btn_add_track'):
+            clean_t = new_t.strip().upper()
+            if clean_t and clean_t not in st.session_state.tracking_tickers:
+                st.session_state.tracking_tickers.append(clean_t)
+                st.success(f'¡{clean_t} añadido con éxito!')
+                st.rerun()
+                
+        st.markdown('**Activos actuales en Seguimiento:**')
+        for t in list(st.session_state.tracking_tickers):
+            c_del1, c_del2 = st.columns([3, 1])
+            with c_del1:
+                st.text(f'• {t} ({NAMES.get(t, "Personalizado")})')
+            with c_del2:
+                if st.button('🗑️', key=f'del_t_{t}'):
+                    st.session_state.tracking_tickers.remove(t)
+                    st.rerun()
