@@ -18,7 +18,8 @@
         "LAES",
         "BTC-USD",
         "MU",
-        "APPL"
+        "APPL",
+        "GOSS"
     ],
     "custom_names": {
         "KO": "Coca-Cola",
@@ -39,7 +40,8 @@
         "RZLV": "Rezolve AI",
         "LAES": "Sealsq / LAES",
         "MU": "Micron Technology, Inc.",
-        "APPL": "APPL"
+        "APPL": "APPL",
+        "GOSS": "Gossamer Bio, Inc."
     },
     "portfolio_positions": {
         "KO": {
