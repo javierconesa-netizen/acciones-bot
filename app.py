@@ -78,7 +78,6 @@ def save_to_github():
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
     headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
     
-    # Obtener el SHA actual si el archivo ya existe
     sha = None
     resp = requests.get(url, headers=headers)
     if resp.status_code == 200:
@@ -237,18 +236,13 @@ with col_gear:
             if st.button('➕ Añadir', key='pop_btn_main'):
                 clean_m = new_m.strip().upper()
                 if clean_m and clean_m not in st.session_state.tickers:
-                    with st.spinner(f"Consultando información de {clean_m}..."):
-                        try:
-                            tk_info = yf.Ticker(clean_m).info
-                            fetched_name = tk_info.get('longName') or tk_info.get('shortName') or clean_m
-                        except Exception:
-                            fetched_name = clean_m
-                        
-                        st.session_state.tickers.append(clean_m)
-                        st.session_state.custom_names[clean_m] = fetched_name
-                        save_to_github() # Guardar cambios en GitHub
-                        st.success(f'¡{fetched_name} ({clean_m}) añadido!')
-                        st.rerun()
+                    st.session_state.tickers.append(clean_m)
+                    if clean_m not in st.session_state.custom_names:
+                        st.session_state.custom_names[clean_m] = clean_m
+                    save_to_github()
+                    st.success(f'¡{clean_m} añadido con éxito!')
+                    st.rerun()
+
             st.markdown('**Activos actuales:**')
             for t in list(st.session_state.tickers):
                 cc1, cc2 = st.columns([3, 1])
@@ -262,7 +256,7 @@ with col_gear:
                                 del st.session_state.portfolio_positions[t]
                             if t in st.session_state.custom_names:
                                 del st.session_state.custom_names[t]
-                            save_to_github() # Guardar cambios en GitHub
+                            save_to_github()
                             st.rerun()
                     else:
                         st.text('Mín 1')
@@ -283,10 +277,19 @@ with col_gear:
                     changed_pos = True
             
             if changed_pos:
-                save_to_github() # Guardar posiciones automáticamente al modificarlas
+                save_to_github()
 
 with st.spinner('Actualizando mercados y posiciones...'):
     df_main = get_comprehensive_market_data_extended(tuple(st.session_state.tickers))
+    
+    # Obtener tipo de cambio EUR/USD actual
+    eur_to_usd = 1.05
+    try:
+        ex_hist = yf.Ticker("EURUSD=X").history(period="1d")
+        if not ex_hist.empty:
+            eur_to_usd = float(ex_hist['Close'].iloc[-1])
+    except Exception:
+        pass
 
 if not df_main.empty:
     total_invested = 0.0
@@ -301,21 +304,32 @@ if not df_main.empty:
             bp = pos.get('buy_price', 0.0)
             if sh > 0 and bp > 0:
                 has_positions = True
-                total_invested += sh * bp
-                total_current_value += sh * row['Precio']
+                price = row['Precio']
+                
+                if row['Moneda'] == '€':
+                    total_invested += (sh * bp) * eur_to_usd
+                    total_current_value += (sh * price) * eur_to_usd
+                else:
+                    total_invested += sh * bp
+                    total_current_value += sh * price
 
     if has_positions:
         total_pl = total_current_value - total_invested
         total_pl_pct = (total_pl / total_invested) * 100 if total_invested > 0 else 0.0
         pl_color = "#3fb950" if total_pl >= 0 else "#f85149"
         
+        # Calcular equivalentes en €
+        total_invested_eur = total_invested / eur_to_usd
+        total_current_value_eur = total_current_value / eur_to_usd
+        total_pl_eur = total_pl / eur_to_usd
+        
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">💰 Inversión Total</h4><h2 style="color: #f0f6fc; font-size: 20px;">${total_invested:,.2f}</h2></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">💰 Inversión Total</h4><h2 style="color: #f0f6fc; font-size: 18px;">${total_invested:,.2f} <span style="font-size: 14px; color: #8b949e; font-weight: normal;">(€{total_invested_eur:,.2f})</span></h2></div>', unsafe_allow_html=True)
         with col2:
-            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">📈 Valor Actual</h4><h2 style="color: #f0f6fc; font-size: 20px;">${total_current_value:,.2f}</h2></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">📈 Valor Actual</h4><h2 style="color: #f0f6fc; font-size: 18px;">${total_current_value:,.2f} <span style="font-size: 14px; color: #8b949e; font-weight: normal;">(€{total_current_value_eur:,.2f})</span></h2></div>', unsafe_allow_html=True)
         with col3:
-            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">⚖️ Plusvalía Global</h4><h2 style="font-size: 20px;"><span style="color: {pl_color};">${total_pl:+,.2f} ({total_pl_pct:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">⚖️ Plusvalía Global</h4><h2 style="font-size: 18px;"><span style="color: {pl_color};">${total_pl:+,.2f} ({total_pl_pct:+.2f}%)</span><br><span style="font-size: 14px; color: #8b949e; font-weight: normal;">(€{total_pl_eur:+,.2f})</span></h2></div>', unsafe_allow_html=True)
     else:
         st.markdown(f'<div style="background: #131b2e; border: 1px solid #21262d; padding: 12px 16px; border-radius: 12px; margin-bottom: 15px; font-size: 14px; color: #8b949e;">📊 <b>Activos Totales en Seguimiento:</b> <span style="color: #f0f6fc; font-weight: bold;">{len(df_main)}</span></div>', unsafe_allow_html=True)
 
@@ -353,7 +367,8 @@ if not df_main.empty:
         sh = pos.get('shares', 0.0)
         bp = pos.get('buy_price', 0.0)
         if sh > 0 and bp > 0:
-            return (row['Precio'] - bp) * sh
+            diff = (row['Precio'] - bp) * sh
+            return diff * eur_to_usd if row['Moneda'] == '€' else diff
         return 0.0
 
     df_main['Temp_P_L'] = df_main.apply(calc_abs_pl, axis=1)
