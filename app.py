@@ -503,7 +503,7 @@ if not df_main.empty:
             f'<div style="display: flex; justify-content: space-between; align-items: flex-start;">'
             f'<div><span style="font-size: 14px; font-weight: bold; color: #f0f6fc;">{row["Nombre"]}</span><br>'
             f'<span style="color: #8b949e; font-size: 10px; background: #1f2937; padding: 1px 5px; border-radius: 4px;">{row["Ticker"]}</span></div>'
-            f'<div style="text-align: right;"><span style="font-size: 16px; font-weight: 800; color: #ffffff;">{row["Moneda"]}{row["Precio']:.3f}</span></div>'
+            f'<div style="text-align: right;"><span style="font-size: 16px; font-weight: 800; color: #ffffff;">{row["Moneda"]}{row["Precio"]:.3f}</span></div>'
             f'</div>'
             f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">'
             f'<div><span style="font-size: 11px; color: #8b949e;">Hoy:</span><br>'
