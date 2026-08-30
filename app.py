@@ -43,11 +43,14 @@ def check_password():
     correct_password = st.secrets.get("PASSWORD", "1234")
     cookie_token = base64.b64encode(correct_password.encode()).decode()
     
-    # Comprobar si ya está en session_state
     if st.session_state.get("password_correct", False):
         return True
 
-    # Comprobar si existe la cookie válida
+    # Dar un ciclo de carga para que el componente lea la cookie del navegador
+    if "cookie_checked" not in st.session_state:
+        st.session_state["cookie_checked"] = True
+        st.rer() if hasattr(st, "rer") else st.rerun()
+
     saved_cookie = cookie_manager.get(cookie="auth_token")
     if saved_cookie == cookie_token:
         st.session_state["password_correct"] = True
