@@ -1,5 +1,10 @@
 import sys
 import os
+import xml.etree.ElementTree as ET
+import requests
+from datetime import datetime
+import pandas as pd
+import streamlit as st
 
 packages_dir = "/tmp/pip_packages"
 os.makedirs(packages_dir, exist_ok=True)
@@ -17,16 +22,11 @@ except ImportError:
     ])
     import yfinance as yf
 
-from datetime import datetime
-import pandas as pd
-import streamlit as st
-
 # Configuración de la página web
 st.set_page_config(
     page_title='Panel de Inversión y Seguimiento', page_icon='📈', layout='wide'
 )
 
-# Listas de activos idénticas a la estructura de tu bot
 TICKERS = [
     'KO',
     'NFLX',
@@ -69,7 +69,6 @@ FALLBACK_DIVIDENDS = {
     'GOOGL': {'div_rate': 0.80, 'yield_pct': 0.45, 'ex_date': 'Próximamente'},
 }
 
-
 @st.cache_data(ttl=300)
 def get_comprehensive_market_data(tickers_list):
   data = []
@@ -91,7 +90,6 @@ def get_comprehensive_market_data(tickers_list):
         currency = '€' if ticker in ['MC.PA', 'NOV.DE'] else '$'
         vol_ratio = (vol_today / avg_volume) * 100 if avg_volume > 0 else 0.0
 
-        # Cálculo de RSI (idéntico al bot)
         delta = hist['Close'].diff()
         gain = delta.where(delta > 0, 0.0)
         loss = -delta.where(delta < 0, 0.0)
@@ -107,7 +105,6 @@ def get_comprehensive_market_data(tickers_list):
         elif current_rsi < 30:
           rsi_label = 'Sobreventa (<30)'
 
-        # Dividendos
         div_rate = 0.0
         yield_pct = 0.0
         ex_date_str = 'Próximamente'
@@ -131,7 +128,6 @@ def get_comprehensive_market_data(tickers_list):
           except Exception:
             pass
 
-        # Earnings
         edate_str = 'No programada'
         try:
           cal = stock.calendar
@@ -164,21 +160,61 @@ def get_comprehensive_market_data(tickers_list):
       print(f'Error procesando {ticker}: {e}')
   return pd.DataFrame(data)
 
+@st.cache_data(ttl=600)
+def fetch_google_news(tickers_list):
+    forbidden_words = [
+        'tenis', 'alcaraz', 'williams', 'us open', 'partido', 'torneo',
+        'enfrentamiento', 'deporte', 'fútbol', 'boxeo', 'muay thai',
+        'combate', 'ufc', 'mma', 'ejercicios', 'entrenamiento', 'método ko',
+    ]
+    news_items = []
+    for ticker in tickers_list:
+        search_term = NAMES.get(ticker, ticker)
+        try:
+            url = f'https://news.google.com/rss/search?q={search_term}&hl=es&gl=ES&ceid=ES:es'
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                root = ET.fromstring(response.content)
+                items = root.findall('.//item')[:2]
+                for item in items:
+                    title_elem = item.find('title')
+                    link_elem = item.find('link')
+                    pub_date_elem = item.find('pubDate')
+                    if title_elem is not None and link_elem is not None:
+                        title = title_elem.text
+                        link = link_elem.text
+                        pub_date = pub_date_elem.text if pub_date_elem is not None else ''
+
+                        title_lower = title.lower()
+                        if any(fw in title_lower for fw in forbidden_words):
+                            continue
+
+                        news_items.append({
+                            'Ticker': ticker,
+                            'Activo': search_term,
+                            'Titulo': title,
+                            'Enlace': link,
+                            'Fecha': pub_date
+                        })
+        except Exception as e:
+            print(f'Error buscando noticias de {ticker}: {e}')
+    return news_items
 
 # Interfaz visual de la Web
 st.title('📊 Panel de Control y Seguimiento Financiero')
 st.markdown(f'*Actualizado a fecha:* {datetime.now().strftime("%d/%m/%Y %H:%M")}')
 
-with st.spinner('Cargando cotizaciones y métricas de mercado...'):
+with st.spinner('Cargando cotizaciones y noticias de mercado...'):
   df_main = get_comprehensive_market_data(TICKERS)
   df_track = get_comprehensive_market_data(TRACKING_TICKERS)
+  all_news = fetch_google_news(TICKERS + TRACKING_TICKERS)
 
-# Pestañas de navegación adaptadas al contenido del bot
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     '🚀 Cartera Principal',
     '🔍 Cartera Seguimiento',
     '📈 Análisis Técnico & RSI',
     '💰 Dividendos & Earnings',
+    '📰 Noticias RSS',
     '📉 Gráficos',
 ])
 
@@ -253,6 +289,16 @@ with tab4:
     )
 
 with tab5:
+  st.subheader('📰 Últimas Noticias de Google News (Filtro Personalizado)')
+  if all_news:
+    for news in all_news:
+      st.markdown(f"**[{news['Activo']}]** [{news['Titulo']}]({news['Enlace']})")
+      st.caption(f"Publicado: {news['Fecha']}")
+      st.markdown('---')
+  else:
+    st.info('No se encontraron noticias recientes o el servicio RSS no devolvió elementos.')
+
+with tab6:
   st.subheader('Evolución Gráfica de Activos (Últimos 3 Meses)')
   all_available_tickers = TICKERS + TRACKING_TICKERS
   selected_ticker = st.selectbox('Selecciona el activo que deseas graficar:', all_available_tickers)
