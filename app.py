@@ -111,7 +111,7 @@ if 'tickers' not in st.session_state:
         st.session_state.tickers = [
             'KO', 'NFLX', 'MC.PA', 'NOV.DE', 'ACHR', 'TSM', 'OPEN', 
             'NVDA', 'IREN', 'ASTS', 'ONDS', 'RKLB', 'GOOGL', 'SLNH', 
-            'RZLV', 'LAES', 'BTC-USD'
+            'RZLV', 'LAES', 'BTC-USD', 'MU'
         ]
 
 if 'portfolio_positions' not in st.session_state:
@@ -132,7 +132,7 @@ if 'custom_names' not in st.session_state:
             'IREN': 'Iris Energy', 'ASTS': 'AST SpaceMobile',
             'ONDS': 'Ondas Holdings', 'RKLB': 'Rocket Lab',
             'SLNH': 'Soluna Holdings', 'RZLV': 'Rezolve AI',
-            'LAES': 'Sealsq / LAES'
+            'LAES': 'Sealsq / LAES', 'MU': 'Micron Technology'
         }
 
 def generate_svg_sparkline(prices, is_positive):
@@ -238,7 +238,12 @@ with col_gear:
                 if clean_m and clean_m not in st.session_state.tickers:
                     st.session_state.tickers.append(clean_m)
                     if clean_m not in st.session_state.custom_names:
-                        st.session_state.custom_names[clean_m] = clean_m
+                        try:
+                            t_info = yf.Ticker(clean_m).info
+                            real_name = t_info.get('longName') or t_info.get('shortName') or clean_m
+                        except Exception:
+                            real_name = clean_m
+                        st.session_state.custom_names[clean_m] = real_name
                     save_to_github()
                     st.success(f'¡{clean_m} añadido con éxito!')
                     st.rerun()
