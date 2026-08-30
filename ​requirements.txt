@@ -1,5 +1,6 @@
 streamlit
 pandas
 requests
-yfinance
-
+beautifulsoup4
+multitasking
+yfinance --no-deps
