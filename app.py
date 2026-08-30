@@ -489,26 +489,11 @@ with tab1:
                 diff_pct = (diff / inv_val) * 100
                 p_color = "#238636" if diff >= 0 else "#da3633"
                 p_sign = "+" if diff >= 0 else ""
-                pos_html = f"""
-                    <div style="border-top: 1px solid #30363d; margin-top: 6px; padding-top: 4px; font-size: 11px;">
-                        💼 {sh:g} acc. | P&L: <span style="color: {p_color}; font-weight: bold;">{p_sign}{row['Moneda']}{diff:,.2f} ({p_sign}{diff_pct:.1f}%)</span>
-                    </div>
-                """
+                pos_html = f'<div style="border-top: 1px solid #30363d; margin-top: 6px; padding-top: 4px; font-size: 11px;">💼 {sh:g} acc. | P&L: <span style="color: {p_color}; font-weight: bold;">{p_sign}{row["Moneda"]}{diff:,.2f} ({p_sign}{diff_pct:.1f}%)</span></div>'
 
-            st.markdown(f"""
-                <div style="background: #161b22; border: 1px solid #30363d; padding: 12px; border-radius: 8px; margin-bottom: 10px;">
-                    <span style="font-size: 13px; font-weight: bold; color: #f0f6fc;">{row['Nombre']}</span><br>
-                    <span style="color: #8b949e; font-size: 10px;">{row['Ticker']}</span>
-                    <div style="margin-top: 4px;">
-                        <span style="font-size: 15px; font-weight: bold; color: #f0f6fc;">{row['Moneda']}{row['Precio']:.3f}</span>
-                    </div>
-                    <div style="font-size: 11px; margin-top: 6px;">
-                        <span>Día: <span style="color: {color_daily}; font-weight: bold;">{sign_daily}{row['Cambio (%)']:.2f}%</span></span><br>
-                        <span>{tf_label}: <span style="color: {color_hist}; font-weight: bold;">{sign_hist}{hist_val:.2f}%</span></span>
-                    </div>
-                    {pos_html}
-                </div>
-            """, unsafe_allow_html=True)
+            card_html = f'<div style="background: #161b22; border: 1px solid #30363d; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><span style="font-size: 13px; font-weight: bold; color: #f0f6fc;">{row["Nombre"]}</span><br><span style="color: #8b949e; font-size: 10px;">{row["Ticker"]}</span><div style="margin-top: 4px;"><span style="font-size: 15px; font-weight: bold; color: #f0f6fc;">{row["Moneda"]}{row["Precio"]:.3f}</span></div><div style="font-size: 11px; margin-top: 6px;"><span>Día: <span style="color: {color_daily}; font-weight: bold;">{sign_daily}{row["Cambio (%)"]:.2f}%</span></span><br><span>{tf_label}: <span style="color: {color_hist}; font-weight: bold;">{sign_hist}{hist_val:.2f}%</span></span></div>{pos_html}</div>'
+
+            st.markdown(card_html, unsafe_allow_html=True)
 
         # Renderizar en cuadrícula de 2 columnas para optimizar móvil
         assets_list = list(df_main.iterrows())
