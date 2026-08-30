@@ -135,7 +135,7 @@ if 'custom_names' not in st.session_state:
             'LAES': 'Sealsq / LAES', 'MU': 'Micron'
         }
 
-# Forzar que MU tenga el nombre correcto si ya venía mal cargado de la nube
+# Asegurar nombre correcto para Micron
 if st.session_state.custom_names.get('MU') in [None, '', 'MU']:
     st.session_state.custom_names['MU'] = 'Micron'
 
@@ -288,7 +288,13 @@ with col_gear:
                     asset_display_name = 'Micron'
                 st.markdown(f"**{asset_display_name} ({t})**")
                 current_pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
-                sh = st.number_input(f"Acciones {t}", value=float(current_pos.get('shares', 0.0)), min_value=0.0, step=1.0, key=f"shares_{t}")
+                
+                # Configurar precisión decimal alta para Bitcoin
+                if 'BTC' in t:
+                    sh = st.number_input(f"Acciones {t}", value=float(current_pos.get('shares', 0.0)), min_value=0.0, step=0.00001, format="%.5f", key=f"shares_{t}")
+                else:
+                    sh = st.number_input(f"Acciones {t}", value=float(current_pos.get('shares', 0.0)), min_value=0.0, step=1.0, key=f"shares_{t}")
+                
                 bp = st.number_input(f"Precio Compra {t}", value=float(current_pos.get('buy_price', 0.0)), min_value=0.0, step=0.01, key=f"buy_price_{t}")
                 
                 new_pos_dict = {'shares': sh, 'buy_price': bp}
@@ -302,7 +308,6 @@ with col_gear:
 with st.spinner('Actualizando mercados y posiciones...'):
     df_main = get_comprehensive_market_data_extended(tuple(st.session_state.tickers))
     
-    # Obtener tipo de cambio EUR/USD actual
     eur_to_usd = 1.05
     try:
         ex_hist = yf.Ticker("EURUSD=X").history(period="1d")
@@ -338,7 +343,6 @@ if not df_main.empty:
         total_pl_pct = (total_pl / total_invested) * 100 if total_invested > 0 else 0.0
         pl_color = "#3fb950" if total_pl >= 0 else "#f85149"
         
-        # Calcular equivalentes en €
         total_invested_eur = total_invested / eur_to_usd
         total_current_value_eur = total_current_value / eur_to_usd
         total_pl_eur = total_pl / eur_to_usd
@@ -431,7 +435,10 @@ if not df_main.empty:
             diff_pct = (diff / inv_val) * 100
             p_color = "#3fb950" if diff >= 0 else "#f85149"
             p_sign = "+" if diff >= 0 else ""
-            pos_html = f'<div style="background: rgba(19, 27, 46, 0.8); border-left: 3px solid {p_color}; margin-top: 8px; padding: 6px 8px; border-radius: 4px; font-size: 11px; display: flex; justify-content: space-between; align-items: center;"><span>💼 {sh:g} acc.</span><span style="color: {p_color}; font-weight: bold;">{p_sign}{row["Moneda"]}{diff:,.2f} ({p_sign}{diff_pct:.1f}%)</span></div>'
+            
+            # Mostrar más decimales en las unidades si es Bitcoin
+            shares_str = f"{sh:.5f}".rstrip('0').rstrip('.') if 'BTC' in t else f"{sh:g}"
+            pos_html = f'<div style="background: rgba(19, 27, 46, 0.8); border-left: 3px solid {p_color}; margin-top: 8px; padding: 6px 8px; border-radius: 4px; font-size: 11px; display: flex; justify-content: space-between; align-items: center;"><span>💼 {shares_str} acc.</span><span style="color: {p_color}; font-weight: bold;">{p_sign}{row["Moneda"]}{diff:,.2f} ({p_sign}{diff_pct:.1f}%)</span></div>'
 
         card_html = (
             f'<div style="background: linear-gradient(145deg, #131b2e 0%, #090d16 100%); border: 1px solid #21262d; border-radius: 14px; padding: 14px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">'
