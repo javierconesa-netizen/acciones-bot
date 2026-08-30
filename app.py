@@ -137,7 +137,6 @@ def get_comprehensive_market_data_extended(tickers_tuple):
                 perf_3m = get_perf(63)
                 perf_6m = get_perf(126)
                 perf_1y = get_perf(252)
-                perf_2y = get_perf(504)
 
                 current_year = datetime.now().year
                 hist_ytd = hist[hist.index.year == current_year]
@@ -158,7 +157,6 @@ def get_comprehensive_market_data_extended(tickers_tuple):
                     'Perf_3M': perf_3m,
                     'Perf_6M': perf_6m,
                     'Perf_1Y': perf_1y,
-                    'Perf_2Y': perf_2y,
                     'Perf_YTD': perf_ytd,
                 })
         except Exception as e:
@@ -230,12 +228,12 @@ if not df_main.empty:
                 total_invested += sh * bp
                 total_current_value += sh * row['Precio']
 
-    col1, col2, col3 = st.columns(3)
     if has_positions:
         total_pl = total_current_value - total_invested
         total_pl_pct = (total_pl / total_invested) * 100 if total_invested > 0 else 0.0
         pl_color = "#238636" if total_pl >= 0 else "#da3633"
         
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown(f'<div class="metric-card"><h4>💰 Inversión Total</h4><h2>${total_invested:,.2f}</h2></div>', unsafe_allow_html=True)
         with col2:
@@ -243,14 +241,7 @@ if not df_main.empty:
         with col3:
             st.markdown(f'<div class="metric-card"><h4>⚖️ Plusvalía Global</h4><h2><span style="color: {pl_color};">${total_pl:+,.2f} ({total_pl_pct:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
     else:
-        best_asset = df_main.sort_values(by='Cambio (%)', ascending=False).iloc[0]
-        worst_asset = df_main.sort_values(by='Cambio (%)', ascending=True).iloc[0]
-        with col1:
-            st.markdown(f'<div class="metric-card"><h4>📊 Activos Totales</h4><h2>{len(df_main)}</h2></div>', unsafe_allow_html=True)
-        with col2:
-            st.markdown(f'<div class="metric-card"><h4>🚀 Mayor Subida</h4><h2>{best_asset["Nombre"]} <span style="color: #238636; font-size: 18px;">({best_asset["Cambio (%)"]:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
-        with col3:
-            st.markdown(f'<div class="metric-card"><h4>🔻 Mayor Bajada</h4><h2>{worst_asset["Nombre"]} <span style="color: #da3633; font-size: 18px;">({worst_asset["Cambio (%)"]:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="background: #161b22; border: 1px solid #30363d; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; color: #8b949e;">📊 <b>Activos Totales:</b> <span style="color: #f0f6fc; font-weight: bold;">{len(df_main)}</span></div>', unsafe_allow_html=True)
 
     st.markdown('---')
 
@@ -258,7 +249,7 @@ if not df_main.empty:
     with c_f1:
         timeframe_label = st.selectbox(
             "⏱️ Seleccionar Periodo Histórico", 
-            ['1 Mes', '3 Meses', '6 Meses', '1 Año', '2 Años', 'Año en curso (YTD)'],
+            ['1 Mes', '3 Meses', '6 Meses', '1 Año', 'Año en curso (YTD)'],
             key='main_tf_select'
         )
     
@@ -267,7 +258,6 @@ if not df_main.empty:
         '3 Meses': 'Perf_3M',
         '6 Meses': 'Perf_6M',
         '1 Año': 'Perf_1Y',
-        '2 Años': 'Perf_2Y',
         'Año en curso (YTD)': 'Perf_YTD'
     }
     active_perf_col = tf_mapping[timeframe_label]
