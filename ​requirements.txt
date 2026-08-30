@@ -1,3 +1,11 @@
 streamlit
 pandas
 requests
+pytz>=2022.5
+lxml
+beautifulsoup4
+multitasking
+peewee
+platformdirs
+websockets<17
+yfinance
