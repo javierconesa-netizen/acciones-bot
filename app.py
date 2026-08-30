@@ -29,17 +29,17 @@ st.set_page_config(
 st.markdown("""
     <style>
     .stApp {
-        background-color: #0e1117;
+        background-color: #0d1117;
         color: #f0f2f6;
     }
     .metric-card {
-        background: linear-gradient(135deg, #1e222d 0%, #161b22 100%);
+        background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
         border: 1px solid #30363d;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        padding: 18px;
+        border-radius: 14px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
         margin-bottom: 15px;
-        transition: transform 0.2s ease;
+        transition: transform 0.2s ease, border-color 0.2s ease;
     }
     .metric-card:hover {
         border-color: #58a6ff;
@@ -82,15 +82,6 @@ if 'custom_names' not in st.session_state:
         'RZLV': 'Rezolve AI',
         'LAES': 'Sealsq / LAES'
     }
-
-FALLBACK_DIVIDENDS = {
-    'KO': {'div_rate': 1.94, 'yield_pct': 3.10, 'ex_date': '15/09/2026'},
-    'MC.PA': {'div_rate': 13.00, 'yield_pct': 2.05, 'ex_date': '28/10/2026'},
-    'NOV.DE': {'div_rate': 3.20, 'yield_pct': 1.40, 'ex_date': '14/09/2026'},
-    'TSM': {'div_rate': 1.60, 'yield_pct': 1.20, 'ex_date': '10/09/2026'},
-    'NVDA': {'div_rate': 0.04, 'yield_pct': 0.03, 'ex_date': '05/09/2026'},
-    'GOOGL': {'div_rate': 0.80, 'yield_pct': 0.45, 'ex_date': 'Próximamente'},
-}
 
 @st.cache_data(ttl=300)
 def get_comprehensive_market_data_extended(tickers_tuple):
@@ -234,17 +225,17 @@ if not df_main.empty:
     if has_positions:
         total_pl = total_current_value - total_invested
         total_pl_pct = (total_pl / total_invested) * 100 if total_invested > 0 else 0.0
-        pl_color = "#238636" if total_pl >= 0 else "#da3633"
+        pl_color = "#3fb950" if total_pl >= 0 else "#f85149"
         
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.markdown(f'<div class="metric-card"><h4>💰 Inversión Total</h4><h2>${total_invested:,.2f}</h2></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 13px; margin-bottom: 5px;">💰 Inversión Total</h4><h2 style="color: #f0f6fc; font-size: 22px;">${total_invested:,.2f}</h2></div>', unsafe_allow_html=True)
         with col2:
-            st.markdown(f'<div class="metric-card"><h4>📈 Valor Actual</h4><h2>${total_current_value:,.2f}</h2></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 13px; margin-bottom: 5px;">📈 Valor Actual</h4><h2 style="color: #f0f6fc; font-size: 22px;">${total_current_value:,.2f}</h2></div>', unsafe_allow_html=True)
         with col3:
-            st.markdown(f'<div class="metric-card"><h4>⚖️ Plusvalía Global</h4><h2><span style="color: {pl_color};">${total_pl:+,.2f} ({total_pl_pct:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card"><h4 style="color: #8b949e; font-size: 13px; margin-bottom: 5px;">⚖️ Plusvalía Global</h4><h2 style="font-size: 22px;"><span style="color: {pl_color};">${total_pl:+,.2f} ({total_pl_pct:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
     else:
-        st.markdown(f'<div style="background: #161b22; border: 1px solid #30363d; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; color: #8b949e;">📊 <b>Activos Totales:</b> <span style="color: #f0f6fc; font-weight: bold;">{len(df_main)}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="background: #161b22; border: 1px solid #30363d; padding: 12px 16px; border-radius: 10px; margin-bottom: 15px; font-size: 14px; color: #8b949e;">📊 <b>Activos Totales:</b> <span style="color: #f0f6fc; font-weight: bold;">{len(df_main)}</span></div>', unsafe_allow_html=True)
 
     st.markdown('---')
 
@@ -302,12 +293,20 @@ if not df_main.empty:
     st.markdown('---')
 
     def render_portfolio_card_grid(row, perf_col, tf_label):
-        color_daily = "#238636" if row['Cambio (%)'] >= 0 else "#da3633"
+        color_daily = "#3fb950" if row['Cambio (%)'] >= 0 else "#f85149"
         sign_daily = "+" if row['Cambio (%)'] >= 0 else ""
         
-        hist_val = row[perf_col]
-        color_hist = "#238636" if hist_val >= 0 else "#da3633"
-        sign_hist = "+" if hist_val >= 0 else ""
+        show_hist = tf_label != 'Actual'
+        hist_badge = ""
+        if show_hist:
+            hist_val = row[perf_col]
+            color_hist = "#3fb950" if hist_val >= 0 else "#f85149"
+            sign_hist = "+" if hist_val >= 0 else ""
+            hist_badge = f'''
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 12px; color: #8b949e;">
+                <span>{tf_label}:</span>
+                <span style="background: {color_hist}22; color: {color_hist}; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px;">{sign_hist}{hist_val:.2f}%</span>
+            </div>'''
 
         t = row['Ticker']
         pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
@@ -320,11 +319,33 @@ if not df_main.empty:
             inv_val = sh * bp
             diff = cur_val - inv_val
             diff_pct = (diff / inv_val) * 100
-            p_color = "#238636" if diff >= 0 else "#da3633"
+            p_color = "#3fb950" if diff >= 0 else "#f85149"
             p_sign = "+" if diff >= 0 else ""
-            pos_html = f'<div style="border-top: 1px solid #30363d; margin-top: 6px; padding-top: 4px; font-size: 11px;">💼 {sh:g} acc. | P&L: <span style="color: {p_color}; font-weight: bold;">{p_sign}{row["Moneda"]}{diff:,.2f} ({p_sign}{diff_pct:.1f}%)</span></div>'
+            pos_html = f'''
+            <div style="background: rgba(22, 27, 34, 0.7); border-left: 3px solid {p_color}; margin-top: 10px; padding: 8px 10px; border-radius: 6px; font-size: 11px; display: flex; justify-content: space-between; align-items: center;">
+                <span>💼 <b>{sh:g}</b> acc.</span>
+                <span style="color: {p_color}; font-weight: bold;">{p_sign}{row["Moneda"]}{diff:,.2f} ({p_sign}{diff_pct:.1f}%)</span>
+            </div>'''
 
-        card_html = f'<div style="background: #161b22; border: 1px solid #30363d; padding: 12px; border-radius: 8px; margin-bottom: 10px;"><span style="font-size: 13px; font-weight: bold; color: #f0f6fc;">{row["Nombre"]} // <span style="color: #8b949e; font-size: 11px; font-weight: normal;">{row["Ticker"]}</span></span><div style="margin-top: 4px;"><span style="font-size: 15px; font-weight: bold; color: #f0f6fc;">{row["Moneda"]}{row["Precio"]:.3f}</span></div><div style="font-size: 11px; margin-top: 6px;"><span>Día: <span style="color: {color_daily}; font-weight: bold;">{sign_daily}{row["Cambio (%)"]:.2f}%</span></span><br><span>{tf_label}: <span style="color: {color_hist}; font-weight: bold;">{sign_hist}{hist_val:.2f}%</span></span></div>{pos_html}</div>'
+        card_html = f'''
+        <div style="background: linear-gradient(145deg, #161b22 0%, #0d1117 100%); border: 1px solid #30363d; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); transition: all 0.2s ease-in-out;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <span style="font-size: 14px; font-weight: bold; color: #f0f6fc;">{row["Nombre"]}</span>
+                    <span style="color: #8b949e; font-size: 11px; margin-left: 6px; background: #21262d; padding: 2px 6px; border-radius: 4px;">{row["Ticker"]}</span>
+                </div>
+                <div style="text-align: right;">
+                    <span style="font-size: 17px; font-weight: 800; color: #ffffff;">{row["Moneda"]}{row["Precio"]:.3f}</span>
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 12px; color: #8b949e;">
+                <span>Hoy:</span>
+                <span style="background: {color_daily}22; color: {color_daily}; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px;">{sign_daily}{row["Cambio (%)"]:.2f}%</span>
+            </div>
+            {hist_badge}
+            {pos_html}
+        </div>'''
 
         st.markdown(card_html, unsafe_allow_html=True)
 
