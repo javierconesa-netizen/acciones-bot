@@ -1,5 +1,8 @@
 import sys
 import os
+import base64
+import requests
+import json
 from datetime import datetime
 import pandas as pd
 import streamlit as st
@@ -50,36 +53,88 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Configuración de GitHub
+GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
+GITHUB_REPO = "javierconesa-netizen/acciones-bot"
+FILE_PATH = "portfolio_data.json"
+
+def load_from_github():
+    if not GITHUB_TOKEN:
+        return None, None, None
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code == 200:
+        file_content = response.json()
+        decoded_content = base64.b64decode(file_content["content"]).decode("utf-8")
+        data = json.loads(decoded_content)
+        return data.get("tickers"), data.get("custom_names"), data.get("portfolio_positions")
+    return None, None, None
+
+def save_to_github():
+    if not GITHUB_TOKEN:
+        return
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
+    
+    # Obtener el SHA actual si el archivo ya existe
+    sha = None
+    resp = requests.get(url, headers=headers)
+    if resp.status_code == 200:
+        sha = resp.json().get("sha")
+        
+    data_to_save = {
+        "tickers": st.session_state.tickers,
+        "custom_names": st.session_state.custom_names,
+        "portfolio_positions": st.session_state.portfolio_positions
+    }
+    
+    json_str = json.dumps(data_to_save, indent=4)
+    encoded_content = base64.b64encode(json_str.encode("utf-8")).decode("utf-8")
+    
+    payload = {
+        "message": "Actualizar datos de cartera automáticamente",
+        "content": encoded_content,
+    }
+    if sha:
+        payload["sha"] = sha
+        
+    requests.put(url, headers=headers, json=payload)
+
+# Inicializar estado cargando desde GitHub o usando valores por defecto
+cloud_tickers, cloud_names, cloud_positions = load_from_github()
+
 if 'tickers' not in st.session_state:
-    st.session_state.tickers = [
-        'KO', 'NFLX', 'MC.PA', 'NOV.DE', 'ACHR', 'TSM', 'OPEN', 
-        'NVDA', 'IREN', 'ASTS', 'ONDS', 'RKLB', 'GOOGL', 'SLNH', 
-        'RZLV', 'LAES', 'BTC-USD'
-    ]
+    if cloud_tickers:
+        st.session_state.tickers = cloud_tickers
+    else:
+        st.session_state.tickers = [
+            'KO', 'NFLX', 'MC.PA', 'NOV.DE', 'ACHR', 'TSM', 'OPEN', 
+            'NVDA', 'IREN', 'ASTS', 'ONDS', 'RKLB', 'GOOGL', 'SLNH', 
+            'RZLV', 'LAES', 'BTC-USD'
+        ]
 
 if 'portfolio_positions' not in st.session_state:
-    st.session_state.portfolio_positions = {}
+    if cloud_positions:
+        st.session_state.portfolio_positions = cloud_positions
+    else:
+        st.session_state.portfolio_positions = {}
 
 if 'custom_names' not in st.session_state:
-    st.session_state.custom_names = {
-        'KO': 'Coca-Cola',
-        'MC.PA': 'LVMH',
-        'BTC-USD': 'Bitcoin',
-        'NOV.DE': 'Novo Nordisk',
-        'OPEN': 'Opendoor Technologies',
-        'NFLX': 'Netflix',
-        'NVDA': 'NVIDIA',
-        'TSM': 'TSMC',
-        'GOOGL': 'Alphabet (Google)',
-        'ACHR': 'Archer Aviation',
-        'IREN': 'Iris Energy',
-        'ASTS': 'AST SpaceMobile',
-        'ONDS': 'Ondas Holdings',
-        'RKLB': 'Rocket Lab',
-        'SLNH': 'Soluna Holdings',
-        'RZLV': 'Rezolve AI',
-        'LAES': 'Sealsq / LAES'
-    }
+    if cloud_names:
+        st.session_state.custom_names = cloud_names
+    else:
+        st.session_state.custom_names = {
+            'KO': 'Coca-Cola', 'MC.PA': 'LVMH', 'BTC-USD': 'Bitcoin',
+            'NOV.DE': 'Novo Nordisk', 'OPEN': 'Opendoor Technologies',
+            'NFLX': 'Netflix', 'NVDA': 'NVIDIA', 'TSM': 'TSMC',
+            'GOOGL': 'Alphabet (Google)', 'ACHR': 'Archer Aviation',
+            'IREN': 'Iris Energy', 'ASTS': 'AST SpaceMobile',
+            'ONDS': 'Ondas Holdings', 'RKLB': 'Rocket Lab',
+            'SLNH': 'Soluna Holdings', 'RZLV': 'Rezolve AI',
+            'LAES': 'Sealsq / LAES'
+        }
 
 def generate_svg_sparkline(prices, is_positive):
     if not prices or len(prices) < 2:
@@ -191,6 +246,7 @@ with col_gear:
                         
                         st.session_state.tickers.append(clean_m)
                         st.session_state.custom_names[clean_m] = fetched_name
+                        save_to_github() # Guardar cambios en GitHub
                         st.success(f'¡{fetched_name} ({clean_m}) añadido!')
                         st.rerun()
             st.markdown('**Activos actuales:**')
@@ -206,19 +262,28 @@ with col_gear:
                                 del st.session_state.portfolio_positions[t]
                             if t in st.session_state.custom_names:
                                 del st.session_state.custom_names[t]
+                            save_to_github() # Guardar cambios en GitHub
                             st.rerun()
                     else:
                         st.text('Mín 1')
 
         with st.expander("💼 Configurar Posiciones"):
             st.markdown("Introduce tus datos por activo:")
+            changed_pos = False
             for t in st.session_state.tickers:
                 asset_display_name = st.session_state.custom_names.get(t, t)
                 st.markdown(f"**{asset_display_name} ({t})**")
                 current_pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
                 sh = st.number_input(f"Acciones {t}", value=float(current_pos.get('shares', 0.0)), min_value=0.0, step=1.0, key=f"shares_{t}")
                 bp = st.number_input(f"Precio Compra {t}", value=float(current_pos.get('buy_price', 0.0)), min_value=0.0, step=0.01, key=f"buy_price_{t}")
-                st.session_state.portfolio_positions[t] = {'shares': sh, 'buy_price': bp}
+                
+                new_pos_dict = {'shares': sh, 'buy_price': bp}
+                if st.session_state.portfolio_positions.get(t) != new_pos_dict:
+                    st.session_state.portfolio_positions[t] = new_pos_dict
+                    changed_pos = True
+            
+            if changed_pos:
+                save_to_github() # Guardar posiciones automáticamente al modificarlas
 
 with st.spinner('Actualizando mercados y posiciones...'):
     df_main = get_comprehensive_market_data_extended(tuple(st.session_state.tickers))
