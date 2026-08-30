@@ -22,21 +22,16 @@ except ImportError:
     ])
     import yfinance as yf
 
-# Configuración de la página web (Modo ancho para aprovechar el diseño)
 st.set_page_config(
     page_title='Panel Financiero Profesional', page_icon='💎', layout='wide'
 )
 
-# Inyección de Estilos CSS Avanzados para un aspecto Profesional y Moderno
 st.markdown("""
     <style>
-    /* Estilo general y tipografía */
     .stApp {
         background-color: #0e1117;
         color: #f0f2f6;
     }
-    
-    /* Tarjetas de métricas personalizadas */
     .metric-card {
         background: linear-gradient(135deg, #1e222d 0%, #161b22 100%);
         border: 1px solid #30363d;
@@ -50,14 +45,10 @@ st.markdown("""
         border-color: #58a6ff;
         transform: translateY(-2px);
     }
-    
-    /* Encabezados de secciones */
     h1, h2, h3 {
         color: #f0f6fc;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    
-    /* Estilo para las pestañas */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
     }
@@ -74,8 +65,6 @@ st.markdown("""
         color: white !important;
         border-color: #2ea043 !important;
     }
-
-    /* Tarjetas de noticias */
     .news-card {
         background-color: #161b22;
         border-left: 4px solid #238636;
@@ -119,7 +108,6 @@ NAMES = {
     'BSIN': 'Black Spade Acquisition'
 }
 
-# Dominios web oficiales para extraer los logos/fotos de las empresas automáticamente
 DOMAINS = {
     'KO': 'coca-cola.com',
     'NFLX': 'netflix.com',
@@ -288,7 +276,6 @@ def fetch_google_news(tickers_list):
             print(f'Error buscando noticias de {ticker}: {e}')
     return news_items
 
-# Cabecera Visual con diseño profesional
 st.title('💎 Terminal de Inversión y Seguimiento Financiero')
 st.markdown(f'<p style="color: #8b949e; font-size: 15px;">🚀 Sincronización en tiempo real — Actualizado a fecha: {datetime.now().strftime("%d/%m/%Y %H:%M")}</p>', unsafe_allow_html=True)
 
@@ -318,13 +305,12 @@ with tab1:
     with col1:
         st.markdown(f'<div class="metric-card"><h4>📊 Activos Totales</h4><h2>{len(df_main)}</h2></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown(f'<div class="metric-card"><h4>🚀 Mayor Subida</h4><h2>{best_asset["Nombre"]} <span style="color: #238636; font-size: 18px;">({best_asset["Cambio (%)"]+.2f}%)</span></h2></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><h4>🚀 Mayor Subida</h4><h2>{best_asset["Nombre"]} <span style="color: #238636; font-size: 18px;">({best_asset["Cambio (%)"]:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
     with col3:
-        st.markdown(f'<div class="metric-card"><h4>🔻 Mayor Bajada</h4><h2>{worst_asset["Nombre"]} <span style="color: #da3633; font-size: 18px;">({worst_asset["Cambio (%)"]+.2f}%)</span></h2></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><h4>🔻 Mayor Bajada</h4><h2>{worst_asset["Nombre"]} <span style="color: #da3633; font-size: 18px;">({worst_asset["Cambio (%)"]:+.2f}%)</span></h2></div>', unsafe_allow_html=True)
 
     st.markdown('---')
     
-    # Vista profesional en tarjetas/tabla con imágenes de logos
     for index, row in df_main_sorted.iterrows():
         color_change = "#238636" if row['Cambio (%)'] >= 0 else "#da3633"
         sign = "+" if row['Cambio (%)'] >= 0 else ""
