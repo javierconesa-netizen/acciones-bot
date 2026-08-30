@@ -30,24 +30,23 @@ st.set_page_config(
 def check_password():
     correct_password = st.secrets.get("PASSWORD", "1234")
     
-    def password_entered():
-        if st.session_state["password"] == correct_password:
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]
-        else:
-            st.session_state["password_correct"] = False
-
-    if "password_correct" not in st.session_state:
-        st.markdown("### 🔐 Acceso Restringido")
-        st.text_input("Introduce la contraseña:", type="password", on_change=password_entered, key="password")
-        return False
-    elif not st.session_state["password_correct"]:
-        st.markdown("### 🔐 Acceso Restringido")
-        st.text_input("Introduce la contraseña:", type="password", on_change=password_entered, key="password")
-        st.error("😕 Contraseña incorrecta")
-        return False
-    else:
+    if st.session_state.get("password_correct", False):
         return True
+
+    st.markdown("### 🔐 Acceso Restringido")
+    with st.form("login_form"):
+        entered_password = st.text_input("Introduce la contraseña:", type="password")
+        submit = st.form_submit_button("Entrar")
+        
+        if submit:
+            if entered_password == correct_password:
+                st.session_state["password_correct"] = True
+                st.rerun()
+            else:
+                st.session_state["password_correct"] = False
+                st.error("😕 Contraseña incorrecta")
+                
+    return False
 
 if not check_password():
     st.stop()
