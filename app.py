@@ -132,8 +132,12 @@ if 'custom_names' not in st.session_state:
             'IREN': 'Iris Energy', 'ASTS': 'AST SpaceMobile',
             'ONDS': 'Ondas Holdings', 'RKLB': 'Rocket Lab',
             'SLNH': 'Soluna Holdings', 'RZLV': 'Rezolve AI',
-            'LAES': 'Sealsq / LAES', 'MU': 'Micron Technology'
+            'LAES': 'Sealsq / LAES', 'MU': 'Micron'
         }
+
+# Forzar que MU tenga el nombre correcto si ya venía mal cargado de la nube
+if st.session_state.custom_names.get('MU') in [None, '', 'MU']:
+    st.session_state.custom_names['MU'] = 'Micron'
 
 def generate_svg_sparkline(prices, is_positive):
     if not prices or len(prices) < 2:
@@ -163,6 +167,9 @@ def get_comprehensive_market_data_extended(tickers_tuple):
 
     for ticker in tickers_tuple:
         search_term = st.session_state.custom_names.get(ticker, ticker)
+        if ticker == 'MU' and search_term == 'MU':
+            search_term = 'Micron'
+            
         try:
             if hist_data is not None and len(tickers_tuple) > 1:
                 try:
@@ -238,11 +245,14 @@ with col_gear:
                 if clean_m and clean_m not in st.session_state.tickers:
                     st.session_state.tickers.append(clean_m)
                     if clean_m not in st.session_state.custom_names:
-                        try:
-                            t_info = yf.Ticker(clean_m).info
-                            real_name = t_info.get('longName') or t_info.get('shortName') or clean_m
-                        except Exception:
-                            real_name = clean_m
+                        if clean_m == 'MU':
+                            real_name = 'Micron'
+                        else:
+                            try:
+                                t_info = yf.Ticker(clean_m).info
+                                real_name = t_info.get('longName') or t_info.get('shortName') or clean_m
+                            except Exception:
+                                real_name = clean_m
                         st.session_state.custom_names[clean_m] = real_name
                     save_to_github()
                     st.success(f'¡{clean_m} añadido con éxito!')
@@ -252,7 +262,10 @@ with col_gear:
             for t in list(st.session_state.tickers):
                 cc1, cc2 = st.columns([3, 1])
                 with cc1:
-                    st.text(f"{st.session_state.custom_names.get(t, t)} ({t})")
+                    display_name = st.session_state.custom_names.get(t, t)
+                    if t == 'MU' and display_name == 'MU':
+                        display_name = 'Micron'
+                    st.text(f"{display_name} ({t})")
                 with cc2:
                     if len(st.session_state.tickers) > 1:
                         if st.button('🗑️', key=f'pop_del_m_{t}'):
@@ -271,6 +284,8 @@ with col_gear:
             changed_pos = False
             for t in st.session_state.tickers:
                 asset_display_name = st.session_state.custom_names.get(t, t)
+                if t == 'MU' and asset_display_name == 'MU':
+                    asset_display_name = 'Micron'
                 st.markdown(f"**{asset_display_name} ({t})**")
                 current_pos = st.session_state.portfolio_positions.get(t, {'shares': 0.0, 'buy_price': 0.0})
                 sh = st.number_input(f"Acciones {t}", value=float(current_pos.get('shares', 0.0)), min_value=0.0, step=1.0, key=f"shares_{t}")
