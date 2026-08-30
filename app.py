@@ -1,6 +1,5 @@
 import sys
 import os
-import textwrap
 from datetime import datetime
 import pandas as pd
 import streamlit as st
@@ -257,7 +256,6 @@ if not df_main.empty:
 
     st.markdown('---')
 
-    # Controles de Periodo y Orden
     c_f1, c_f2 = st.columns(2)
     with c_f1:
         timeframe_label = st.selectbox(
@@ -335,30 +333,22 @@ if not df_main.empty:
             p_sign = "+" if diff >= 0 else ""
             pos_html = f'<div style="background: rgba(19, 27, 46, 0.8); border-left: 3px solid {p_color}; margin-top: 8px; padding: 6px 8px; border-radius: 4px; font-size: 11px; display: flex; justify-content: space-between; align-items: center;"><span>💼 {sh:g} acc.</span><span style="color: {p_color}; font-weight: bold;">{p_sign}{row["Moneda"]}{diff:,.2f} ({p_sign}{diff_pct:.1f}%)</span></div>'
 
-        card_html = textwrap.dedent(f'''
-        <div style="background: linear-gradient(145deg, #131b2e 0%, #090d16 100%); border: 1px solid #21262d; border-radius: 14px; padding: 14px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <span style="font-size: 14px; font-weight: bold; color: #f0f6fc;">{row["Nombre"]}</span><br>
-                    <span style="color: #8b949e; font-size: 10px; background: #1f2937; padding: 1px 5px; border-radius: 4px;">{row["Ticker"]}</span>
-                </div>
-                <div style="text-align: right;">
-                    <span style="font-size: 16px; font-weight: 800; color: #ffffff;">{row["Moneda"]}{row["Precio"]:.3f}</span>
-                </div>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-                <div>
-                    <span style="font-size: 11px; color: #8b949e;">Hoy:</span><br>
-                    <span style="color: {color_daily}; font-weight: bold; font-size: 12px;">{sign_daily}{row["Cambio (%)"]:.2f}%</span>
-                </div>
-                <div>
-                    {row["Sparkline"]}
-                </div>
-            </div>
-            {hist_badge}
-            {pos_html}
-        </div>''').strip()
+        card_html = (
+            f'<div style="background: linear-gradient(145deg, #131b2e 0%, #090d16 100%); border: 1px solid #21262d; border-radius: 14px; padding: 14px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">'
+            f'<div style="display: flex; justify-content: space-between; align-items: flex-start;">'
+            f'<div><span style="font-size: 14px; font-weight: bold; color: #f0f6fc;">{row["Nombre"]}</span><br>'
+            f'<span style="color: #8b949e; font-size: 10px; background: #1f2937; padding: 1px 5px; border-radius: 4px;">{row["Ticker"]}</span></div>'
+            f'<div style="text-align: right;"><span style="font-size: 16px; font-weight: 800; color: #ffffff;">{row["Moneda"]}{row["Precio"]:.3f}</span></div>'
+            f'</div>'
+            f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">'
+            f'<div><span style="font-size: 11px; color: #8b949e;">Hoy:</span><br>'
+            f'<span style="color: {color_daily}; font-weight: bold; font-size: 12px;">{sign_daily}{row["Cambio (%)"]:.2f}%</span></div>'
+            f'<div>{row["Sparkline"]}</div>'
+            f'</div>'
+            f'{hist_badge}'
+            f'{pos_html}'
+            f'</div>'
+        )
 
         st.markdown(card_html, unsafe_allow_html=True)
 
