@@ -163,14 +163,9 @@ def get_comprehensive_market_data_extended(tickers_tuple):
             print(f'Error procesando {ticker}: {e}')
     return pd.DataFrame(data)
 
-# Cabecera principal con Título y Botón de Ajustes (Engranaje)
-col_title, col_gear = st.columns([5, 1])
-with col_title:
-    st.title('Mi Cartera')
-    st.markdown(f'<p style="color: #8b949e; font-size: 15px; margin-top: -10px;">🚀 Sincronización en tiempo real — Actualizado a fecha: {datetime.now().strftime("%d/%m/%Y %H:%M")}</p>', unsafe_allow_html=True)
-
+# Botón de Ajustes (Engranaje) alineado a la derecha
+col_empty, col_gear = st.columns([5, 1])
 with col_gear:
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     with st.popover("⚙️", help="Panel de Control"):
         st.markdown("### ⚙️ Panel de Control")
         
@@ -304,13 +299,6 @@ if not df_main.empty:
     elif 'Ganancias Reales (€) [Menor a Mayor]' in sort_option:
         df_main = df_main.sort_values(by='Temp_P_L', ascending=True)
 
-    csv_main = df_main.drop(columns=['Temp_P_L']).to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 Descargar Cartera Principal (CSV)",
-        data=csv_main,
-        file_name='cartera_principal.csv',
-        mime='text/csv',
-    )
     st.markdown('---')
 
     def render_portfolio_card_grid(row, perf_col, tf_label):
@@ -351,3 +339,12 @@ if not df_main.empty:
             if i + 1 < len(assets_list):
                 _, row = assets_list[i + 1]
                 render_portfolio_card_grid(row, active_perf_col, timeframe_label)
+
+    st.markdown('---')
+    csv_main = df_main.drop(columns=['Temp_P_L']).to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Descargar Cartera Principal (CSV)",
+        data=csv_main,
+        file_name='cartera_principal.csv',
+        mime='text/csv',
+    )
