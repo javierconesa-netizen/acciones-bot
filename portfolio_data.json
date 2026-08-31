@@ -6,7 +6,6 @@
         "NOV.DE",
         "ACHR",
         "TSM",
-        "OPEN",
         "NVDA",
         "IREN",
         "ASTS",
@@ -23,7 +22,6 @@
         "MC.PA": "LVMH",
         "BTC-USD": "Bitcoin",
         "NOV.DE": "Novo Nordisk",
-        "OPEN": "Opendoor Technologies",
         "NFLX": "Netflix",
         "NVDA": "NVIDIA",
         "TSM": "TSMC",
@@ -62,10 +60,6 @@
         "TSM": {
             "shares": 2.45,
             "buy_price": 404.41
-        },
-        "OPEN": {
-            "shares": 95.0,
-            "buy_price": 3.42
         },
         "NVDA": {
             "shares": 4.8,
