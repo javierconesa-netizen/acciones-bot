@@ -623,4 +623,4 @@ def check_market():
 
 if __name__ == '__main__':
   check_market()
-  check_all_news()
+  check_all_news() 
